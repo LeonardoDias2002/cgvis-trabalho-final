@@ -100,7 +100,5 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 >   implementar** ou que você **irá implementar parcialmente**.
 > - Para cada item, **explique por que** não será implementado ou por
 >   que será implementado parcialmente.
->
-> No vídeo acima os jogadores jogam simultaneamente (sem alternância de turnos) num multiplayer online, em nosso projeto só será possível jogar localmente, num sistema de turnos. Além disso jogo usado como inspiração conta com 9 pistas e um modo de edição de mapa, enquanto nosso trabalho terá 5 pistas padrão e não contará com o modo de edição de mapa/criação de novas pistas.
 
-<mark>`<preencher>`</mark>
+<mark>`No vídeo acima os jogadores jogam simultaneamente (sem alternância de turnos) num multiplayer online, em nosso projeto só será possível jogar localmente, num sistema de turnos. Além disso jogo usado como inspiração conta com 9 pistas e um modo de edição de mapa, enquanto nosso trabalho terá 5 pistas padrão e não contará com o modo de edição de mapa/criação de novas pistas.`</mark>
