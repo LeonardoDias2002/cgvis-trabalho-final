@@ -15,6 +15,7 @@
 //  vira
 //    #include <cstdio> // Em C++
 //
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -301,6 +302,7 @@ int main(int argc, char* argv[])
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
     LoadTextureImage("../../data/rocky_terrain_02_diff_1k.jpg"); // TextureImage1
+    LoadTextureImage("../../data/golf_fbx_golf_club_BaseColor.png"); // TextureImage2
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -314,6 +316,11 @@ int main(int argc, char* argv[])
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
+
+    // Construímos o Taco de Golfe
+    ObjModel tacomodel("../../data/golf_club_and_ball_obj.obj");
+    ComputeNormals(&tacomodel);
+    BuildTrianglesAndAddToVirtualScene(&tacomodel);
 
     if ( argc > 1 )
     {
@@ -413,6 +420,7 @@ int main(int argc, char* argv[])
         #define SPHERE 0
         #define BUNNY  1
         #define PLANE  2
+        #define TACO   3
 
         // Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f)
@@ -435,6 +443,15 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
+
+        //desenhamos o Taco de Golfe
+        model =
+            Matrix_Translate(0.0f, 0.5f, 0.0f) 
+            * Matrix_Scale(1.05f, 1.0f, 1.05f);      
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, TACO);
+        DrawVirtualObject("golf_club.002_Cube.003");
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
@@ -602,6 +619,7 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); //taco 
     glUseProgram(0);
 }
 
