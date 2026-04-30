@@ -117,14 +117,16 @@ void PopMatrix(glm::mat4& M);
 // logo após a definição de main() neste arquivo.
 void BuildTrianglesAndAddToVirtualScene(ObjModel*); // Constrói representação de um ObjModel como malha de triângulos para renderização
 void ComputeNormals(ObjModel* model); // Computa normais de um ObjModel, caso não existam.
-void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
+glm::mat4 CalcularTaco(glm::vec3 posicao_bola, glm::vec3 direcao_taco = glm::vec3(0.0f, 0.0f, -1.0f), float distancia_offset = 0.2f); //calcula a posição do taco
 void LoadTextureImage(const char* filename); // Função que carrega imagens de textura
+void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
 void DrawVirtualObject(const char* object_name); // Desenha um objeto armazenado em g_VirtualScene
 GLuint LoadShader_Vertex(const char* filename);   // Carrega um vertex shader
 GLuint LoadShader_Fragment(const char* filename); // Carrega um fragment shader
 void LoadShader(const char* filename, GLuint shader_id); // Função utilizada pelas duas acima
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
+void RotacionarTaco(GLFWwindow* window); // atualiza a animação do taco
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
@@ -207,6 +209,18 @@ float g_ForearmAngleX = 0.0f;
 // Variáveis que controlam translação do torso
 float g_TorsoPositionX = 0.0f;
 float g_TorsoPositionY = 0.0f;
+
+// Variáveis que rastreiam as posições da bola e taco de golfe (vou usar para posicionar o taco atrás da bola)
+glm::vec3 g_PosBola = glm::vec3(1.0f, 0.5f, 0.0f); //posição atual da bola de golfe
+glm::vec3 g_PosTaco = glm::vec3(0.0f, 0.0f, -1.0f); // direção apontada pelo taco
+float g_DistanciaTaco = 0.2f; // distância entre o taco e a bola
+float g_TacoRotacao = 0.0f; // angulo rotação do taco 
+float g_TacoRotacaoVertical = 0.0f; // angulo rotação vertical do taco
+
+// Variáveis pra controlar a animação do taco
+double g_TempoRotacaoTaco = -1.0; // tempo de início da rotacao
+float g_DuracaoRotacaoTaco = 0.5f; // duração darotacao em segundos
+float g_AnguloRotacaoTaco = M_PI / 2.5f; // angulo máximo
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
@@ -322,6 +336,11 @@ int main(int argc, char* argv[])
     ComputeNormals(&tacomodel);
     BuildTrianglesAndAddToVirtualScene(&tacomodel);
 
+    // Construímos a Bola de Golfe
+    ObjModel bolamodel("../../data/golf_ball.obj");
+    ComputeNormals(&bolamodel);
+    BuildTrianglesAndAddToVirtualScene(&bolamodel);
+
     if ( argc > 1 )
     {
         ObjModel model(argv[1]);
@@ -359,6 +378,9 @@ int main(int argc, char* argv[])
         // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
+
+        // aciona a animação do taco, caso esteja em andamento
+        RotacionarTaco(window);
 
         // Computamos a posição da câmera utilizando coordenadas esféricas.  As
         // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
@@ -421,19 +443,22 @@ int main(int argc, char* argv[])
         #define BUNNY  1
         #define PLANE  2
         #define TACO   3
+        #define BOLA   4
 
         // Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
+        model = Matrix_Translate(0.9f,0.3f,0.0f)
               * Matrix_Rotate_Z(0.6f)
               * Matrix_Rotate_X(0.2f)
-              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
+              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f)
+              * Matrix_Scale(0.04f, 0.04f, 0.04f);  
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, SPHERE);
         DrawVirtualObject("the_sphere");
 
         // Desenhamos o modelo do coelho
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
+        model = Matrix_Translate(1.0f,0.3f,0.0f)
+              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f)
+              * Matrix_Scale(0.004f, 0.004f, 0.004f);  
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BUNNY);
         DrawVirtualObject("the_bunny");
@@ -444,14 +469,23 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
-        //desenhamos o Taco de Golfe
-        model =
-            Matrix_Translate(0.0f, 0.5f, 0.0f) 
-            * Matrix_Scale(1.05f, 1.0f, 1.05f);      
+        // desenhamos o Taco de Golfe 
+        model = CalcularTaco(g_PosBola, g_PosTaco, g_DistanciaTaco);
 
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, TACO);
         DrawVirtualObject("golf_club.002_Cube.003");
+
+
+        //desenhamos a Bola de Golfe
+        model =
+            Matrix_Translate(g_PosBola.x, g_PosBola.y, g_PosBola.z) 
+            * Matrix_Scale(0.004f, 0.004f, 0.004f);      
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, BOLA);
+        DrawVirtualObject("golf_ball");
+
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
@@ -905,6 +939,76 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
     glBindVertexArray(0);
 }
 
+// função que calcula a posição e orientação do taco de golfe baseado na posição da bola
+
+//  posicao_bola: posição  da bola de golfe
+//  direcao_taco: direção emque o taco está apontando 
+//  distancia: distância entre a bola e o  taco 
+
+//IMPOTANTE: é OBRIGATÓRIO usar mat4 se não o código quebra, demorei para entender isso
+//segundo um cara no stackoverflow "matrizes 4x4 são as únicas capazes de combinar translação, rotação e escala em uma única estrutura matemática"
+glm::mat4 CalcularTaco(glm::vec3 posicao_bola, glm::vec3 direcao_taco, float distancia)
+{
+    //calcula a posição do taco 
+    float cosseno = cos(g_TacoRotacao);
+    float seno = sin(g_TacoRotacao);
+    
+    // posição atrás da bola
+    glm::vec3 posicao_taco = posicao_bola + glm::vec3(
+        cosseno * distancia,  // X
+        0.0f,                    // Y vou usar dps
+        seno * distancia    //Z 
+    );
+    
+    glm::mat4 modelo = Matrix_Translate(posicao_taco.x, posicao_taco.y, posicao_taco.z)
+                     * Matrix_Rotate_Y(g_TacoRotacao)  // rotação do taco quando clica A, D ou espaço
+                     * Matrix_Rotate_Z(g_TacoRotacaoVertical) // rotação vertical do taco (levanta do outro lado)
+                     * Matrix_Scale(0.05f, 0.05f, 0.05f); //ESCALA DO TACO
+    
+    return modelo;
+}
+
+// Função que atualiza a animação do taco
+void RotacionarTaco(GLFWwindow* window)
+{
+    if (g_TempoRotacaoTaco < 0.0) 
+    {
+        // está parado
+        g_TacoRotacaoVertical = 0.0f;
+        return;
+    }
+    
+    double Atual = glfwGetTime();
+    double Total = Atual - g_TempoRotacaoTaco;
+    
+    // se a animação terminou voltar ao repouso
+    if (Total >= g_DuracaoRotacaoTaco)
+    {
+        g_TacoRotacaoVertical = 0.0f;
+        g_TempoRotacaoTaco = -1.0; // reseta o tempo
+        return;
+    }
+    
+    // Ccalcular a progressão do swing 0 - 1
+    float progress = (float)(Total / g_DuracaoRotacaoTaco);
+    
+    // usar uma curva (talvez possamos usar Bezier cubica) para a animação 
+    // primeira metade levanta a ponta do taco 
+    // segunda metade abaixa a ponta do taco 
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    {
+        // Subida 
+        float t = progress * 2.0f; 
+        g_TacoRotacaoVertical = g_AnguloRotacaoTaco * sin(t * M_PI / 2.0f);
+    }
+    else
+    {
+        // Descida 
+        float t = (progress - 0.5f) * 2.0f; 
+        g_TacoRotacaoVertical = g_AnguloRotacaoTaco * sin((1.0f - t) * M_PI / 2.0f);
+    }
+}
+
 // Carrega um Vertex Shader de um arquivo GLSL. Veja definição de LoadShader() abaixo.
 GLuint LoadShader_Vertex(const char* filename)
 {
@@ -1243,7 +1347,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     //   Se apertar tecla Z       então g_AngleZ += delta;
     //   Se apertar tecla shift+Z então g_AngleZ -= delta;
 
-    float delta = 3.141592 / 16; // 22.5 graus, em radianos.
+    // variaveis para rotacionar o taco de golfe
+    float delta = M_PI / 16; // 22.5 graus radianos. podemos mudar depois
+    float deltaVertical = M_PI / 16; // 22.5 graus radianos
 
     if (key == GLFW_KEY_X && action == GLFW_PRESS)
     {
@@ -1259,8 +1365,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
     }
 
-    // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
+    // Se o usuário apertar a tecla espaço, iniciamos o swing do taco.
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    {
+        g_TempoRotacaoTaco = glfwGetTime();
+    }
+
+    // Se o usuário apertar a tecla backspace, resetamos os ângulos de Euler para zero.
+    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
     {
         g_AngleX = 0.0f;
         g_AngleY = 0.0f;
@@ -1269,6 +1381,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_ForearmAngleZ = 0.0f;
         g_TorsoPositionX = 0.0f;
         g_TorsoPositionY = 0.0f;
+        g_TacoRotacao = 0.0f;
+        g_TacoRotacaoVertical = 0.0f;
     }
 
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
@@ -1296,6 +1410,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
     }
+
+    // apertar a tecla A rotaciona o taco pra esquerda da bola
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    {
+        g_TacoRotacao += delta;
+    }
+
+    // apertar a tecla D rotaciona o taco pra direita da bola
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        g_TacoRotacao -= delta;
+    }
+
 }
 
 // Definimos o callback para impressão de erros da GLFW no terminal
