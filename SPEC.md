@@ -83,11 +83,15 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 ### Modelos de Iluminação em todos os objetos
 <mark>`Utilizaremos o modelo de iluminação de Lambert, a ser aplicado em todos os objetos relevantes do jogo.`</mark>
 
+> Comentário Professor: O modelo de Lambert é puramente difuso. Precisam colocar algum modelo com "brilho" (specular), por exemplo no metal do taco e na bolinha.
+
 ### Mapeamento de texturas em todos os objetos
 <mark>`A grama e as paredes da pista, bem como a bolinha terão texturas customizáveis que poderão ser escolhidas pelo jogador.`</mark>
 
 ### Movimentação com curva Bézier cúbica
 <mark>`A movimentação da bolinha no caso da tacada sair do chão, a trajetória dela será de acordo com uma curva de Bézier cúbica. No início do nível a câmera rotacionará ao redor dele para mostrar o design da pista para os jogadores.`</mark>
+
+> Comentário Professor: Para a bolinha, acho melhor usar uma dinâmica mais livre, conforme vimos em aula (integrar aceleração, velocidade, etc.). Para a tacada, o movimento do taco pode ser uma curva de Bézier.
 
 ### Animações baseadas no tempo ($\Delta t$)
 <mark>`Haverão animações baseadas no tempo na movimentação da bola após a tacada, bem como em caso de colisões, e no taco do jogador no momento da jogada.`</mark>
