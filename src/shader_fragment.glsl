@@ -22,7 +22,16 @@ uniform mat4 projection;
 #define SPHERE 0
 #define BUNNY  1
 #define PLANE  2
+#define TACO   3
+#define BOLA   4
+#define BURACO 5
+#define TRAJETORIA 6
+#define MASTRO 7
+#define BANDEIRA 8
+#define HUD_BARRA 9
+#define GRAMA 10
 uniform int object_id;
+uniform float u_ForcaPercent; // Usado para a barra de força
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
 uniform vec4 bbox_min;
@@ -69,7 +78,9 @@ void main()
     float V = 0.0;
 
 	// Coeficiente de refletância difusa
-	vec3 Kd0;
+	vec3 Kd0 = vec3(0.5, 0.5, 0.5);
+    vec3 Ks = vec3(0.0, 0.0, 0.0);
+    float q = 1.0;
 
     if ( object_id == SPHERE )
     {
@@ -134,11 +145,80 @@ void main()
 		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
 		Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
     }
+    else if ( object_id == TACO )
+    {
+        Kd0 = vec3(0.7, 0.7, 0.7); // taco de metal
+        Ks = vec3(0.8, 0.8, 0.8);
+        q = 32.0;
+    }
+    else if ( object_id == BOLA )
+    {
+        Kd0 = vec3(1.0, 1.0, 1.0); // bola branca
+        Ks = vec3(0.5, 0.5, 0.5);
+        q = 64.0;
+    }
+    else if ( object_id == BURACO )
+    {
+        Kd0 = vec3(0.02, 0.02, 0.02); // buraco quase preto
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
+    else if ( object_id == TRAJETORIA )
+    {
+        Kd0 = vec3(1.0, 1.0, 1.0); // bolinhas de mira brancas
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
+    else if ( object_id == MASTRO )
+    {
+        Kd0 = vec3(0.8, 0.8, 0.8); // cinza prateado
+        Ks = vec3(0.5, 0.5, 0.5);
+        q = 32.0;
+    }
+    else if ( object_id == BANDEIRA )
+    {
+        Kd0 = vec3(1.0, 0.2, 0.2); // bandeira vermelha
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
+    else if ( object_id == GRAMA )
+    {
+        Kd0 = vec3(0.1, 0.6, 0.1); // grama viva
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
 
-    // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
+    if ( object_id == HUD_BARRA ) 
+    {
+        // Interface 2D na tela, sem iluminação.
+        // Interpolação de cor baseada na força: Verde -> Amarelo -> Vermelho
+        vec3 colorGreen = vec3(0.0, 1.0, 0.0);
+        vec3 colorRed = vec3(1.0, 0.0, 0.0);
+        // O mix funciona bem direto para verde e vermelho, criando tons quentes no meio.
+        color.rgb = mix(colorGreen, colorRed, u_ForcaPercent);
+        color.a = 1.0;
+        return; // não aplica iluminação
+    }
 
-    color.rgb = Kd0 * (lambert + 0.01);
+    // Equação de Iluminação (Toon Shading)
+    float lambert = max(0.0, dot(n,l));
+    
+    // Discretiza o lambert para criar o efeito Toon/Cel Shading
+    float steps = 4.0;
+    lambert = floor(lambert * steps) / steps;
+    
+    // Blinn-Phong para o especular
+    vec4 h = normalize(v + l);
+    float specular = pow(max(0.0, dot(n, h)), q);
+    
+    // Corte duro para o brilho (highlights cartunescos)
+    if (specular > 0.5) {
+        specular = 1.0;
+    } else {
+        specular = 0.0;
+    }
+
+    color.rgb = Kd0 * (lambert + 0.2) + Ks * specular; // 0.2 de luz ambiente
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
     // necessário:
