@@ -202,6 +202,12 @@ float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 
+glm::mat4 view = Matrix_Camera_View(
+    glm::vec4(0.0f, 0.0f, 3.5f, 1.0f), // posição da câmera
+    glm::vec4(0.0f, 0.0f, -1.0f, 0.0f), // direção para onde a câmera aponta
+    glm::vec4(0.0f, 1.0f, 0.0f, 0.0f) // vetor "up" da câmera
+);
+
 // Variáveis que controlam rotação do antebraço
 float g_ForearmAngleZ = 0.0f;
 float g_ForearmAngleX = 0.0f;
@@ -231,6 +237,12 @@ glm::mat4 g_BolaRotationMatrix = glm::mat4(1.0f); // Rotação acumulativa da bo
 bool g_EspacoPressionado = false;
 double g_InicioEspaco = 0.0;
 float g_ForcaTacada = 0.0f;
+
+// Variável que define o Field of View (FOV)
+float field_of_view = M_PI / 3.0f;
+
+// Variável que controla se a camera está rotacionando (false = segue a bola, true = rotaciona com o mouse)
+bool rotacao_camera = false;
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
@@ -443,24 +455,45 @@ int main(int argc, char* argv[])
         }
 
         RotacionarTaco(window);
+        
+        if(!rotacao_camera){
+            // A câmera segue a bola mantendo o POV do golfista
+            // Aproximamos a câmera para o estilo 8 Ball Pool
+            g_CameraDistance = 1.0f;
+            float camera_height = 0.35f;
 
-        // A câmera segue a bola mantendo o POV do golfista
-        // Aproximamos a câmera para o estilo 8 Ball Pool
-        g_CameraDistance = 1.0f;
-        float camera_height = 0.35f;
-        glm::vec4 camera_position_c  = glm::vec4(
-            g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
-            g_PosBola.y + camera_height,
-            g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
-            1.0f
-        );
-        glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+            glm::vec4 camera_position_c  = glm::vec4(
+                g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
+                g_PosBola.y + camera_height,
+                g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
+                1.0f
+            );
+            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 
-        // Computamos a matriz "View" utilizando os parâmetros da câmera para
-        // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+            // Computamos a matriz "View" utilizando os parâmetros da câmera para
+            // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+            view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        }
+        else{
+
+            g_CameraDistance = 1.0f;
+
+            // Coordenadas esféricas
+            float camera_x = g_PosBola.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
+            float camera_y = g_PosBola.y + g_CameraDistance * sin(g_CameraPhi);
+            float camera_z = g_PosBola.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
+
+            glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
+            glm::vec4 camera_lookat_l = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+            glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
+
+
+            view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        }
+
 
         // Agora computamos a matriz de Projeção.
         glm::mat4 projection;
@@ -474,7 +507,16 @@ int main(int argc, char* argv[])
         {
             // Projeção Perspectiva.
             // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-            float field_of_view = 3.141592 / 3.0f;
+            
+            
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
+                field_of_view = field_of_view * 1.01f; //Taxa de zoom in
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && field_of_view > M_PI / 5.0f) { //Zoom out máximo (π/5 rad  = 36 graus)
+                field_of_view = field_of_view / 1.01f; //Taxa de zoom out
+            }
+
             projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
         }
         else
@@ -1359,6 +1401,9 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         // com o botão esquerdo pressionado.
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_LeftMouseButtonPressed = true;
+
+        rotacao_camera = true; //habilitamos a rotação da camera   
+
     }
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
     {
@@ -1375,6 +1420,10 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         // com o botão esquerdo pressionado.
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_RightMouseButtonPressed = true;
+
+
+        rotacao_camera = false; //desabilitamos a rotação da camera      
+
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
     {
@@ -1421,7 +1470,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         g_CameraPhi   += 0.01f*dy;
     
         // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
-        float phimax = 3.141592f/2;
+        float phimax = M_PI/2;
         float phimin = -phimax;
     
         if (g_CameraPhi > phimax)
@@ -1712,7 +1761,9 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
     // Mostra a força da tacada atual de forma visual
     if (g_ShowInfoText) {
         if (!g_EspacoPressionado && g_TempoRotacaoTaco < 0.0) {
-            TextRendering_PrintString(window, "Mire com [A] / [D]. Segure [Espaco] para bater.", -1.0f+charwidth, 1.0f-2.5f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Mire com [A] / [D]. Zoom com [W] / [S]", -1.0f+charwidth, 1.0f-2.5f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Mova a câmera com o [M1]. Clique com [M2] para fixar na bolinha", -1.0f+charwidth, 1.0f-5.0f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Segure [Espaco] para bater", -1.0f+charwidth, 1.0f-7.5f*lineheight, 1.2f);
         }
     }
 }
