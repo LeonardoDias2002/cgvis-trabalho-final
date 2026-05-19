@@ -1759,12 +1759,20 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
     TextRendering_PrintString(window, buffer, 1.0f-(numchars + 1)*charwidth, 1.0f-lineheight, 1.0f);
     
     // Mostra a força da tacada atual de forma visual
-    if (g_ShowInfoText) {
+    if (g_ShowInfoText && !g_BolaNoBuraco) {
         if (!g_EspacoPressionado && g_TempoRotacaoTaco < 0.0) {
             TextRendering_PrintString(window, "Mire com [A] / [D]. Zoom com [W] / [S]", -1.0f+charwidth, 1.0f-2.5f*lineheight, 1.2f);
-            TextRendering_PrintString(window, "Mova a câmera com o [M1]. Clique com [M2] para fixar na bolinha", -1.0f+charwidth, 1.0f-5.0f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Mova a camera com o [M1]. Resetar com [M2]", -1.0f+charwidth, 1.0f-5.0f*lineheight, 1.2f);
             TextRendering_PrintString(window, "Segure [Espaco] para bater", -1.0f+charwidth, 1.0f-7.5f*lineheight, 1.2f);
         }
+    }
+
+
+    float lineheight_vitoria = TextRendering_LineHeight(window) * 3.0f;
+    float charwidth_vitoria = TextRendering_CharWidth(window) * 3.0f;
+
+    if(g_BolaNoBuraco){
+        TextRendering_PrintString(window, "Voce ganhou! Parabens!", -1.0f+charwidth_vitoria, 1.0f-7.5f*lineheight_vitoria, 4.2f);
     }
 }
 
