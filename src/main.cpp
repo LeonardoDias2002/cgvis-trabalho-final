@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - Seu Cartao - Seu Nome", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "INF01047 - Gabriel & Leonardo - Seu Nome", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -362,6 +362,17 @@ int main(int argc, char* argv[])
     ObjModel bolamodel("../../data/golf_ball.obj");
     ComputeNormals(&bolamodel);
     BuildTrianglesAndAddToVirtualScene(&bolamodel);
+
+    // Construímos a Pista com loop
+    ObjModel PistaLoopmodel("../../data/PistaLoop.obj");
+    ComputeNormals(&PistaLoopmodel);
+    BuildTrianglesAndAddToVirtualScene(&PistaLoopmodel);
+
+    // Construímos a bandeira
+    ObjModel bandeiramodel("../../data/bandeira.obj");
+    ComputeNormals(&bandeiramodel);
+    BuildTrianglesAndAddToVirtualScene(&bandeiramodel);
+
 
     if ( argc > 1 )
     {
@@ -446,11 +457,18 @@ int main(int argc, char* argv[])
         // Controle suave de mira do taco (apenas se a bola estiver parada)
         if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
             float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
                 g_TacoRotacao += delta_mira;
             }
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
                 g_TacoRotacao -= delta_mira;
+            }
+        }
+
+        //teleporta pra proxima pista (debug)
+        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
+            if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+                g_PosBola = glm::vec3(203.75f, 0.025f, -3.0f);
             }
         }
 
@@ -550,12 +568,15 @@ int main(int argc, char* argv[])
         #define TRAJETORIA 6
         #define MASTRO 7
         #define BANDEIRA 8
+        #define GRAMA 10
+        #define PISTALOOP 11
+        #define BANDEIRA2 12
 
         // Desabilitamos Culling para desenhar as paredes de todos os lados
         glDisable(GL_CULL_FACE);
 
         // Chão de GRAMA (Terreno Aberto)
-        #define GRAMA 10
+        
         model = Matrix_Translate(0.0f, -0.01f, 0.0f) * Matrix_Scale(50.0f, 1.0f, 50.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GRAMA);
@@ -654,6 +675,19 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BOLA);
         DrawVirtualObject("the_sphere");
+
+        // Desenha a Pista em loop
+        model = Matrix_Translate(200.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PISTALOOP);
+        DrawVirtualObject("loop");
+
+        // Desenha a Bandeira
+        /*model = Matrix_Translate(1.0f, 1.0f, 1.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, BANDEIRA2);
+        DrawVirtualObject("Cylinder");*/
+
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
         if (g_EspacoPressionado) {
