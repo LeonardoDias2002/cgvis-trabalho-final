@@ -238,6 +238,9 @@ bool g_EspacoPressionado = false;
 double g_InicioEspaco = 0.0;
 float g_ForcaTacada = 0.0f;
 
+//Posição da luz pontual
+glm::vec3 g_PosLuz(0.0f, 10.0f, 0.0f);
+
 // Variável que define o Field of View (FOV)
 float field_of_view = M_PI / 3.0f;
 
@@ -717,6 +720,10 @@ int main(int argc, char* argv[])
             
             glEnable(GL_DEPTH_TEST); // Restaura
         }
+
+        //mandamos a posição da luz para o fragment_shader para ser utilizada na iluminação
+        glUseProgram(g_GpuProgramID);
+        glUniform3f( glGetUniformLocation(g_GpuProgramID, "g_PosLuz"), g_PosLuz.x, g_PosLuz.y, g_PosLuz.z );
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.

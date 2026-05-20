@@ -13,6 +13,9 @@ in vec4 position_model;
 // Coordenadas de textura obtidas do arquivo OBJ (se existirem!)
 in vec2 texcoords;
 
+//luz pontual
+uniform vec3 g_PosLuz;
+
 // Matrizes computadas no código C++ e enviadas para a GPU
 uniform mat4 model;
 uniform mat4 view;
@@ -65,13 +68,13 @@ void main()
 
     // Normal do fragmento atual, interpolada pelo rasterizador a partir das
     // normais de cada vértice.
-    vec4 n = normalize(normal);
+    vec3 n = normalize(normal.xyz);
 
     // Vetor que define o sentido da fonte de luz em relação ao ponto atual.
-    vec4 l = normalize(vec4(1.0,1.0,0.0,0.0));
+    vec3 l = normalize(g_PosLuz - p.xyz);
 
     // Vetor que define o sentido da câmera em relação ao ponto atual.
-    vec4 v = normalize(camera_position - p);
+    vec3 v = normalize(camera_position.xyz - p.xyz);
 
     // Coordenadas de textura U e V
     float U = 0.0;
@@ -208,7 +211,7 @@ void main()
     lambert = floor(lambert * steps) / steps;
     
     // Blinn-Phong para o especular
-    vec4 h = normalize(v + l);
+    vec3 h = normalize(v + l);
     float specular = pow(max(0.0, dot(n, h)), q);
     
     // Corte duro para o brilho (highlights cartunescos)
@@ -218,7 +221,15 @@ void main()
         specular = 0.0;
     }
 
-    color.rgb = Kd0 * (lambert + 0.2) + Ks * specular; // 0.2 de luz ambiente
+    float distance = length(g_PosLuz - p.xyz);
+
+    float constant = 0.3;
+    float linear = 0.0001;
+    float quadratic = 0.005;
+
+    float atenuacao = 1.0 / ( constant + linear * distance + quadratic * distance * distance);
+
+        color.rgb = ( Kd0 * (lambert + 0.2) + Ks * specular) * atenuacao;
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
     // necessário:
