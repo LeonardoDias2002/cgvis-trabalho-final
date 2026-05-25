@@ -27,11 +27,12 @@ const GLchar* const textvertexshader_source = ""
 const GLchar* const textfragmentshader_source = ""
 "#version 330\n"
 "uniform sampler2D tex;\n"
+"uniform vec3 textColor;\n"
 "in vec2 texCoords;\n"
 "out vec4 fragColor;\n"
 "void main()\n"
 "{\n"
-    "fragColor = vec4(0, 0, 0, texture(tex, texCoords).r);\n"
+    "fragColor = vec4(textColor, texture(tex, texCoords).r);\n"
 "}\n"
 "\0";
 
@@ -134,11 +135,13 @@ void TextRendering_Init()
 
     glUseProgram(textprogram_id);
     glUniform1i(texttex_uniform, textureunit);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 0.0f, 0.0f, 0.0f);
     glUseProgram(0);
     glCheckError();
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    glActiveTexture(GL_TEXTURE0);
     glCheckError();
 }
 

@@ -128,6 +128,23 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // 
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 void RotacionarTaco(GLFWwindow* window); // atualiza a animação do taco
 
+// Funções do sistema de menu
+void MenuInit();
+void MenuUpdate(GLFWwindow* window, float delta_time);
+void MenuRenderOverlay(GLFWwindow* window);
+void MenuRenderMainMenu(GLFWwindow* window);
+void MenuRenderLevelSelect(GLFWwindow* window);
+void MenuRenderSettings(GLFWwindow* window);
+void MenuHandleClick(GLFWwindow* window);
+void DrawHudQuad(float cx, float cy, float hw, float hh);
+bool IsMouseOverRect(GLFWwindow* w, float cx, float cy, float hw, float hh);
+bool RenderButton(GLFWwindow* window, float cx, float cy, float hw, float hh,
+                  const char* label, float r1, float g1, float b1, float r2, float g2, float b2,
+                  bool enabled);
+void RenderSlider(GLFWwindow* window, float cx, float cy, float hw, float hh, float value);
+GLuint LoadTextureImageRGBA(const char* filename, int* outW, int* outH);
+GLuint CompileHudShaders();
+
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
 void TextRendering_Init();
@@ -265,6 +282,31 @@ GLint g_bbox_max_uniform;
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
 
+// ========== SISTEMA DE MENU ==========
+enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING };
+GameState g_CurrentState = MENU_MAIN;
+float g_MenuCameraAngle = 0.0f;
+float g_MasterVolume = 0.8f;
+int g_TexturaPistaGrama = 0;  // 0=rocky, 1=brick, 2=solid green
+int g_TexturaPistaParede = 0; // 0=rocky, 1=brick, 2=solid gray
+int g_TexturaBola = 0;        // 0=white, 1=brick, 2=rocky
+int g_TexturaTaco = 0;        // 0=metal, 1=textured, 2=brick
+GLuint g_HudShaderProgram = 0;
+GLuint g_HudVAO = 0;
+GLuint g_HudVBO = 0;
+GLuint g_LogoTextureID = 0;
+int g_LogoWidth = 1, g_LogoHeight = 1;
+// Hover states para botões do menu
+bool g_HoverJogar = false, g_HoverNiveis = false;
+bool g_HoverConfig = false, g_HoverSair = false;
+bool g_HoverVoltar = false;
+bool g_HoverGramaL = false, g_HoverGramaR = false;
+bool g_HoverParedeL = false, g_HoverParedeR = false;
+bool g_HoverBolaL = false, g_HoverBolaR = false;
+bool g_HoverTacoL = false, g_HoverTacoR = false;
+// Extern para acessar o shader de texto (definido em textrendering.cpp)
+extern GLuint textprogram_id;
+
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -386,6 +428,9 @@ int main(int argc, char* argv[])
     // Inicializamos o código para renderização de texto.
     TextRendering_Init();
 
+    // Inicializamos o sistema de menu (HUD shader, logo, VAO/VBO)
+    MenuInit();
+
     // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
     glEnable(GL_DEPTH_TEST);
 
@@ -402,6 +447,16 @@ int main(int argc, char* argv[])
         float current_time = (float)glfwGetTime();
         float delta_time = current_time - previous_time;
         previous_time = current_time;
+
+        // ===== MENU MODE: renderiza menu e pula gameplay =====
+        if (g_CurrentState != PLAYING) {
+            glClearColor(0.05f, 0.08f, 0.12f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            MenuUpdate(window, delta_time);
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+            continue;
+        }
 
         // Atualização da física da bola
         if (!g_BolaNoBuraco) {
@@ -449,6 +504,12 @@ int main(int argc, char* argv[])
         glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(g_GpuProgramID);
+
+        // Envia uniforms de seleção de textura para o shader
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaGramaPista"), g_TexturaPistaGrama);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaParedesPista"), g_TexturaPistaParede);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaBola"), g_TexturaBola);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaTaco"), g_TexturaTaco);
 
         // Calcular a força acumulada se a barra de espaço estiver sendo pressionada
         if (g_EspacoPressionado && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0) {
@@ -574,6 +635,8 @@ int main(int argc, char* argv[])
         #define GRAMA 10
         #define PISTALOOP 11
         #define BANDEIRA2 12
+        #define PISTA_CHAO 13
+        #define PISTA_PAREDE 14
 
         // Desabilitamos Culling para desenhar as paredes de todos os lados
         glDisable(GL_CULL_FACE);
@@ -589,31 +652,31 @@ int main(int argc, char* argv[])
         // Chão da pista
         model = Matrix_Translate(0.0f,0.0f,0.0f) * Matrix_Scale(2.0f, 1.0f, 5.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
+        glUniform1i(g_object_id_uniform, PISTA_CHAO);
         DrawVirtualObject("the_plane");
 
         // Parede Esquerda (Agora baixinhas, com escala y = 0.1 e translate y = 0.1)
         model = Matrix_Translate(2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
+        glUniform1i(g_object_id_uniform, PISTA_PAREDE);
         DrawVirtualObject("the_plane");
 
         // Parede Direita
         model = Matrix_Translate(-2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
+        glUniform1i(g_object_id_uniform, PISTA_PAREDE);
         DrawVirtualObject("the_plane");
 
         // Parede Fundo
         model = Matrix_Translate(0.0f, 0.1f, 5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
+        glUniform1i(g_object_id_uniform, PISTA_PAREDE);
         DrawVirtualObject("the_plane");
 
         // Parede Frente
         model = Matrix_Translate(0.0f, 0.1f, -5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
+        glUniform1i(g_object_id_uniform, PISTA_PAREDE);
         DrawVirtualObject("the_plane");
 
         // Reativamos o Culling para os objetos 3D normais
@@ -1435,6 +1498,11 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
+        // No menu, processar clique nos botões
+        if (g_CurrentState != PLAYING) {
+            MenuHandleClick(window);
+            return;
+        }
         // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
         // posição atual do cursor nas variáveis g_LastCursorPosX e
         // g_LastCursorPosY.  Também, setamos a variável
@@ -1499,6 +1567,9 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // instante de tempo, e usamos esta movimentação para atualizar os
     // parâmetros que definem a posição da câmera dentro da cena virtual.
     // Assim, temos que o usuário consegue controlar a câmera.
+
+    // No menu, não rotacionar a câmera
+    if (g_CurrentState != PLAYING) return;
 
     if (g_LeftMouseButtonPressed)
     {
@@ -1577,9 +1648,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     Correcao_KeyCallback(key, action, mod);
     // =======================
 
-    // Se o usuário pressionar a tecla ESC, fechamos a janela.
+    // Se o usuário pressionar a tecla ESC, navega menus ou fecha a janela.
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+    {
+        if (g_CurrentState == PLAYING) {
+            g_CurrentState = MENU_MAIN;
+            g_LeftMouseButtonPressed = false;
+            g_RightMouseButtonPressed = false;
+        } else if (g_CurrentState == MENU_LEVELS || g_CurrentState == MENU_SETTINGS) {
+            g_CurrentState = MENU_MAIN;
+        } else {
+            glfwSetWindowShouldClose(window, GL_TRUE);
+        }
+    }
 
     // O código abaixo implementa a seguinte lógica:
     //   Se apertar tecla X       então g_AngleX += delta;
@@ -1989,3 +2070,529 @@ void PrintObjModelInfo(ObjModel* model)
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
 
+// =============================================
+// IMPLEMENTAÇÃO DO SISTEMA DE MENU
+// =============================================
+
+GLuint LoadTextureImageRGBA(const char* filename, int* outW, int* outH)
+{
+    printf("Carregando imagem RGBA \"%s\"... ", filename);
+    stbi_set_flip_vertically_on_load(true);
+    int w, h, ch;
+    unsigned char* data = stbi_load(filename, &w, &h, &ch, 4);
+    if (!data) {
+        fprintf(stderr, "ERRO: Nao foi possivel abrir \"%s\".\n", filename);
+        return 0;
+    }
+    printf("OK (%dx%d).\n", w, h);
+    if (outW) *outW = w;
+    if (outH) *outH = h;
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    stbi_image_free(data);
+    return tex;
+}
+
+GLuint CompileHudShaders()
+{
+    const char* vs_src =
+        "#version 330 core\n"
+        "layout(location=0) in vec2 aPos;\n"
+        "layout(location=1) in vec2 aUV;\n"
+        "out vec2 vUV;\n"
+        "void main(){\n"
+        "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
+        "   vUV = aUV;\n"
+        "}\n";
+    const char* fs_src =
+        "#version 330 core\n"
+        "in vec2 vUV;\n"
+        "uniform int u_Mode;\n"
+        "uniform sampler2D u_Texture;\n"
+        "uniform vec4 u_Color1;\n"
+        "uniform vec4 u_Color2;\n"
+        "uniform float u_Hover;\n"
+        "uniform float u_Value;\n"
+        "uniform float u_Radius;\n"
+        "uniform vec2 u_Size;\n"
+        "out vec4 fragColor;\n"
+        "void main(){\n"
+        "   if(u_Mode==0){\n"
+        "       fragColor = texture(u_Texture, vUV);\n"
+        "   } else if(u_Mode==1){\n"
+        "       vec3 c = mix(u_Color1.rgb, u_Color2.rgb, vUV.y);\n"
+        "       vec2 p = vUV * u_Size;\n"
+        "       vec2 h2 = u_Size*0.5;\n"
+        "       vec2 d = abs(p - h2) - (h2 - vec2(u_Radius));\n"
+        "       float dist = length(max(d,vec2(0.0))) - u_Radius;\n"
+        "       float a = 1.0 - smoothstep(-1.0, 1.0, dist);\n"
+        "       c = c + vec3(u_Hover * 0.12);\n"
+        "       fragColor = vec4(c, a * u_Color1.a);\n"
+        "   } else if(u_Mode==2){\n"
+        "       vec2 p = vUV * u_Size;\n"
+        "       vec2 h2 = u_Size*0.5;\n"
+        "       vec2 d = abs(p - h2) - (h2 - vec2(u_Radius));\n"
+        "       float dist = length(max(d,vec2(0.0))) - u_Radius;\n"
+        "       float a = 1.0 - smoothstep(-1.0, 1.0, dist);\n"
+        "       float f = step(vUV.x, u_Value);\n"
+        "       vec3 c = mix(vec3(0.15,0.15,0.2), u_Color1.rgb, f);\n"
+        "       fragColor = vec4(c, a * 0.9);\n"
+        "   }\n"
+        "}\n";
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vs_src, NULL);
+    glCompileShader(vs);
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fs_src, NULL);
+    glCompileShader(fs);
+    GLuint prog = glCreateProgram();
+    glAttachShader(prog, vs);
+    glAttachShader(prog, fs);
+    glLinkProgram(prog);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    return prog;
+}
+
+void MenuInit()
+{
+    g_HudShaderProgram = CompileHudShaders();
+    glGenVertexArrays(1, &g_HudVAO);
+    glGenBuffers(1, &g_HudVBO);
+    glBindVertexArray(g_HudVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_HudVBO);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    g_LogoTextureID = LoadTextureImageRGBA("../../GOLFinho-removebg-preview.png", &g_LogoWidth, &g_LogoHeight);
+}
+
+void DrawHudQuad(float cx, float cy, float hw, float hh)
+{
+    float x0=cx-hw, y0=cy-hh, x1=cx+hw, y1=cy+hh;
+    float verts[] = {
+        x0,y0, 0,0,  x1,y0, 1,0,  x1,y1, 1,1,
+        x0,y0, 0,0,  x1,y1, 1,1,  x0,y1, 0,1
+    };
+    glBindVertexArray(g_HudVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_HudVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+bool IsMouseOverRect(GLFWwindow* w, float cx, float cy, float hw, float hh)
+{
+    double mx, my;
+    glfwGetCursorPos(w, &mx, &my);
+    int ww, wh;
+    glfwGetWindowSize(w, &ww, &wh);
+    float nx = (2.0f*(float)mx/ww)-1.0f;
+    float ny = 1.0f-(2.0f*(float)my/wh);
+    return nx>=cx-hw && nx<=cx+hw && ny>=cy-hh && ny<=cy+hh;
+}
+
+// Helpers para setar uniforms do HUD shader
+static void SHU1i(const char* n, int v) { glUniform1i(glGetUniformLocation(g_HudShaderProgram, n), v); }
+static void SHU1f(const char* n, float v) { glUniform1f(glGetUniformLocation(g_HudShaderProgram, n), v); }
+static void SHU2f(const char* n, float a, float b) { glUniform2f(glGetUniformLocation(g_HudShaderProgram, n), a, b); }
+static void SHU4f(const char* n, float a, float b, float c, float d) { glUniform4f(glGetUniformLocation(g_HudShaderProgram, n), a, b, c, d); }
+
+bool RenderButton(GLFWwindow* window, float cx, float cy, float hw, float hh,
+                  const char* label, float r1, float g1, float b1, float r2, float g2, float b2,
+                  bool enabled)
+{
+    bool hovered = enabled && IsMouseOverRect(window, cx, cy, hw, hh);
+    glUseProgram(g_HudShaderProgram);
+    SHU1i("u_Mode", 1);
+    if (enabled) {
+        SHU4f("u_Color1", r1, g1, b1, 0.92f);
+        SHU4f("u_Color2", r2, g2, b2, 0.92f);
+    } else {
+        SHU4f("u_Color1", 0.35f, 0.35f, 0.38f, 0.7f);
+        SHU4f("u_Color2", 0.25f, 0.25f, 0.28f, 0.7f);
+    }
+    SHU1f("u_Hover", hovered ? 1.0f : 0.0f);
+    SHU1f("u_Radius", 10.0f);
+    int ww, wh;
+    glfwGetWindowSize(window, &ww, &wh);
+    SHU2f("u_Size", hw*(float)ww, hh*(float)wh);
+    DrawHudQuad(cx, cy, hw, hh);
+
+    // Texto branco sobre botão
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    float charw = TextRendering_CharWidth(window);
+    float textLen = strlen(label) * charw * 1.5f;
+    float textX = cx - textLen / 2.0f;
+    float textY = cy - TextRendering_LineHeight(window) * 0.75f;
+    TextRendering_PrintString(window, label, textX, textY, 1.5f);
+    // Re-ativar blend (PrintString desativa)
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // Resetar cor do texto para preto
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 0.0f, 0.0f, 0.0f);
+    return hovered;
+}
+
+void RenderSlider(GLFWwindow* window, float cx, float cy, float hw, float hh, float value)
+{
+    glUseProgram(g_HudShaderProgram);
+    SHU1i("u_Mode", 2);
+    SHU4f("u_Color1", 0.2f, 0.7f, 0.35f, 1.0f);
+    SHU1f("u_Value", value);
+    SHU1f("u_Radius", 6.0f);
+    int ww, wh;
+    glfwGetWindowSize(window, &ww, &wh);
+    SHU2f("u_Size", hw*(float)ww, hh*(float)wh);
+    DrawHudQuad(cx, cy, hw, hh);
+}
+
+void MenuRenderMainMenu(GLFWwindow* window)
+{
+    int ww, wh;
+    glfwGetWindowSize(window, &ww, &wh);
+    float aspect = (float)ww / (float)wh;
+
+    // Logo com transparência
+    glUseProgram(g_HudShaderProgram);
+    SHU1i("u_Mode", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_LogoTextureID);
+    SHU1i("u_Texture", 0);
+    float logoAspect = (float)g_LogoWidth / (float)g_LogoHeight;
+    float logoHH = 0.28f;
+    float logoHW = logoHH * logoAspect / aspect;
+    DrawHudQuad(0.0f, 0.52f, logoHW, logoHH);
+
+    // Botões do menu principal
+    float btnHW = 0.22f;
+    float btnHH = 0.055f;
+    g_HoverJogar = RenderButton(window, 0.0f, 0.05f, btnHW, btnHH, "JOGAR",
+        0.18f, 0.72f, 0.35f,  0.10f, 0.50f, 0.22f, true);
+    g_HoverNiveis = RenderButton(window, 0.0f, -0.10f, btnHW, btnHH, "NIVEIS",
+        0.25f, 0.50f, 0.85f,  0.15f, 0.35f, 0.65f, true);
+    g_HoverConfig = RenderButton(window, 0.0f, -0.25f, btnHW, btnHH, "CONFIGURACOES",
+        0.85f, 0.65f, 0.18f,  0.65f, 0.45f, 0.10f, true);
+    g_HoverSair = RenderButton(window, 0.0f, -0.40f, btnHW, btnHH, "SAIR",
+        0.85f, 0.22f, 0.18f,  0.65f, 0.12f, 0.10f, true);
+}
+
+void MenuRenderLevelSelect(GLFWwindow* window)
+{
+    // Título
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "SELECIONAR NIVEL", -0.40f, 0.70f, 2.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Botões de nível
+    float btnSize = 0.075f;
+    float startX = -0.40f;
+    float spacing = 0.20f;
+    for (int i = 0; i < 5; i++) {
+        float bx = startX + i * spacing;
+        bool enabled = (i == 0);
+        char label[4];
+        snprintf(label, 4, "%d", i + 1);
+        RenderButton(window, bx, 0.15f, btnSize, btnSize, label,
+            0.18f, 0.72f, 0.35f,  0.10f, 0.50f, 0.22f, enabled);
+        if (!enabled) {
+            glUseProgram(textprogram_id);
+            glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 0.9f, 0.3f, 0.3f);
+            float cw = TextRendering_CharWidth(window);
+            TextRendering_PrintString(window, "BLOQ.", bx - cw*3.0f, 0.01f, 1.0f);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+    }
+    // Botão voltar
+    g_HoverVoltar = RenderButton(window, -0.72f, 0.78f, 0.14f, 0.04f, "< VOLTAR",
+        0.45f, 0.45f, 0.50f,  0.30f, 0.30f, 0.35f, true);
+    // Resetar cor do texto
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 0.0f, 0.0f, 0.0f);
+}
+
+void MenuRenderSettings(GLFWwindow* window)
+{
+    const char* gramaOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Verde Solido"};
+    const char* paredeOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Cinza Solido"};
+    const char* bolaOpcoes[] = {"Branca", "Tijolo", "Rochosa"};
+    const char* tacoOpcoes[] = {"Metal Cinza", "Texturizado", "Tijolo"};
+
+    // Título
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "CONFIGURACOES", -0.35f, 0.75f, 2.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Volume
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Volume:", -0.55f, 0.50f, 1.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    RenderSlider(window, 0.15f, 0.50f, 0.30f, 0.025f, g_MasterVolume);
+    char volBuf[8];
+    snprintf(volBuf, 8, "%d%%", (int)(g_MasterVolume*100));
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, volBuf, 0.50f, 0.48f, 1.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Seletores de textura
+    float settY = 0.30f;
+    float settStep = 0.15f;
+    float arrowBtn = 0.028f;
+
+    // --- Grama da Pista ---
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Grama Pista:", -0.55f, settY, 1.3f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverGramaL = RenderButton(window, 0.08f, settY, arrowBtn, arrowBtn, "<",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 0.95f, 0.7f);
+    TextRendering_PrintString(window, gramaOpcoes[g_TexturaPistaGrama], 0.15f, settY-0.015f, 1.1f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverGramaR = RenderButton(window, 0.60f, settY, arrowBtn, arrowBtn, ">",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+
+    settY -= settStep;
+    // --- Paredes da Pista ---
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Paredes Pista:", -0.55f, settY, 1.3f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverParedeL = RenderButton(window, 0.08f, settY, arrowBtn, arrowBtn, "<",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 0.95f, 0.7f);
+    TextRendering_PrintString(window, paredeOpcoes[g_TexturaPistaParede], 0.15f, settY-0.015f, 1.1f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverParedeR = RenderButton(window, 0.60f, settY, arrowBtn, arrowBtn, ">",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+
+    settY -= settStep;
+    // --- Textura da Bola ---
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Textura Bola:", -0.55f, settY, 1.3f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverBolaL = RenderButton(window, 0.08f, settY, arrowBtn, arrowBtn, "<",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 0.95f, 0.7f);
+    TextRendering_PrintString(window, bolaOpcoes[g_TexturaBola], 0.15f, settY-0.015f, 1.1f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverBolaR = RenderButton(window, 0.60f, settY, arrowBtn, arrowBtn, ">",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+
+    settY -= settStep;
+    // --- Textura do Taco ---
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Textura Taco:", -0.55f, settY, 1.3f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverTacoL = RenderButton(window, 0.08f, settY, arrowBtn, arrowBtn, "<",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 0.95f, 0.7f);
+    TextRendering_PrintString(window, tacoOpcoes[g_TexturaTaco], 0.15f, settY-0.015f, 1.1f);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    g_HoverTacoR = RenderButton(window, 0.60f, settY, arrowBtn, arrowBtn, ">",
+        0.3f, 0.5f, 0.75f, 0.2f, 0.35f, 0.55f, true);
+
+    // Resetar cor do texto
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 0.0f, 0.0f, 0.0f);
+
+    // Botão voltar
+    g_HoverVoltar = RenderButton(window, -0.72f, 0.78f, 0.14f, 0.04f, "< VOLTAR",
+        0.45f, 0.45f, 0.50f,  0.30f, 0.30f, 0.35f, true);
+}
+
+void MenuRenderOverlay(GLFWwindow* window)
+{
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Overlay escuro semi-transparente para legibilidade
+    glUseProgram(g_HudShaderProgram);
+    SHU1i("u_Mode", 1);
+    SHU4f("u_Color1", 0.0f, 0.02f, 0.05f, 0.45f);
+    SHU4f("u_Color2", 0.0f, 0.0f, 0.0f, 0.55f);
+    SHU1f("u_Hover", 0.0f);
+    SHU1f("u_Radius", 0.0f);
+    int ww, wh;
+    glfwGetWindowSize(window, &ww, &wh);
+    SHU2f("u_Size", (float)ww, (float)wh);
+    DrawHudQuad(0.0f, 0.0f, 1.0f, 1.0f);
+
+    if (g_CurrentState == MENU_MAIN) {
+        MenuRenderMainMenu(window);
+    } else if (g_CurrentState == MENU_LEVELS) {
+        MenuRenderLevelSelect(window);
+    } else if (g_CurrentState == MENU_SETTINGS) {
+        MenuRenderSettings(window);
+    }
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void MenuUpdate(GLFWwindow* window, float delta_time)
+{
+    g_MenuCameraAngle += delta_time * 0.3f;
+    float cam_dist = 6.0f;
+    float cam_height = 3.0f;
+    glm::vec4 cam_pos = glm::vec4(
+        cos(g_MenuCameraAngle)*cam_dist, cam_height,
+        sin(g_MenuCameraAngle)*cam_dist, 1.0f);
+    glm::vec4 cam_look = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    glm::vec4 cam_view_vec = cam_look - cam_pos;
+    glm::vec4 cam_up = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+    glm::mat4 mv = Matrix_Camera_View(cam_pos, cam_view_vec, cam_up);
+    glm::mat4 mp = Matrix_Perspective(M_PI/3.0f, g_ScreenRatio, -0.1f, -50.0f);
+
+    glUseProgram(g_GpuProgramID);
+    glUniformMatrix4fv(g_view_uniform, 1, GL_FALSE, glm::value_ptr(mv));
+    glUniformMatrix4fv(g_projection_uniform, 1, GL_FALSE, glm::value_ptr(mp));
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaGramaPista"), g_TexturaPistaGrama);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaParedesPista"), g_TexturaPistaParede);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaBola"), g_TexturaBola);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaTaco"), g_TexturaTaco);
+    glUniform3f(glGetUniformLocation(g_GpuProgramID, "g_PosLuz"), g_PosLuz.x, g_PosLuz.y, g_PosLuz.z);
+
+    glm::mat4 model;
+    glDisable(GL_CULL_FACE);
+
+    // Grama global
+    model = Matrix_Translate(0.0f, -0.01f, 0.0f) * Matrix_Scale(50.0f, 1.0f, 50.0f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, GRAMA);
+    DrawVirtualObject("the_plane");
+
+    // Chão da pista
+    model = Matrix_Translate(0.0f,0.0f,0.0f) * Matrix_Scale(2.0f, 1.0f, 5.0f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, PISTA_CHAO);
+    DrawVirtualObject("the_plane");
+
+    // Paredes
+    model = Matrix_Translate(2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
+    DrawVirtualObject("the_plane");
+    model = Matrix_Translate(-2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
+    DrawVirtualObject("the_plane");
+    model = Matrix_Translate(0.0f, 0.1f, 5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
+    DrawVirtualObject("the_plane");
+    model = Matrix_Translate(0.0f, 0.1f, -5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
+    DrawVirtualObject("the_plane");
+
+    glEnable(GL_CULL_FACE);
+
+    // Buraco
+    glm::vec3 hp(0.0f, 0.0f, 4.0f);
+    model = Matrix_Translate(hp.x, hp.y+0.01f, hp.z) * Matrix_Scale(0.12f, 0.001f, 0.12f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, BURACO);
+    DrawVirtualObject("the_sphere");
+    // Mastro
+    model = Matrix_Translate(hp.x+0.2f, hp.y+0.5f, hp.z) * Matrix_Scale(0.015f, 0.5f, 0.015f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, MASTRO);
+    DrawVirtualObject("the_sphere");
+    // Bandeira
+    model = Matrix_Translate(hp.x+0.35f, hp.y+0.8f, hp.z) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.15f, 1.0f, 0.1f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, BANDEIRA);
+    DrawVirtualObject("the_plane");
+
+    // Bola estática para visualização
+    model = Matrix_Translate(0.0f, 0.025f, -3.0f) * Matrix_Scale(0.025f, 0.025f, 0.025f);
+    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, BOLA);
+    DrawVirtualObject("the_sphere");
+
+    // Renderiza overlay do menu
+    MenuRenderOverlay(window);
+}
+
+void MenuHandleClick(GLFWwindow* window)
+{
+    if (g_CurrentState == MENU_MAIN) {
+        if (g_HoverJogar) {
+            g_CurrentState = PLAYING;
+            g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
+            g_VelocidadeBola = glm::vec3(0.0f);
+            g_BolaNoBuraco = false;
+            g_BolaRotationMatrix = glm::mat4(1.0f);
+            g_TacoRotacao = 0.0f;
+        }
+        else if (g_HoverNiveis) g_CurrentState = MENU_LEVELS;
+        else if (g_HoverConfig) g_CurrentState = MENU_SETTINGS;
+        else if (g_HoverSair) glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+    else if (g_CurrentState == MENU_LEVELS) {
+        if (g_HoverVoltar) g_CurrentState = MENU_MAIN;
+        else if (IsMouseOverRect(window, -0.40f, 0.15f, 0.075f, 0.075f)) {
+            g_CurrentState = PLAYING;
+            g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
+            g_VelocidadeBola = glm::vec3(0.0f);
+            g_BolaNoBuraco = false;
+            g_BolaRotationMatrix = glm::mat4(1.0f);
+            g_TacoRotacao = 0.0f;
+        }
+    }
+    else if (g_CurrentState == MENU_SETTINGS) {
+        if (g_HoverVoltar) g_CurrentState = MENU_MAIN;
+        // Volume slider clique
+        if (IsMouseOverRect(window, 0.15f, 0.50f, 0.30f, 0.025f)) {
+            double mx, my;
+            glfwGetCursorPos(window, &mx, &my);
+            int ww, wh;
+            glfwGetWindowSize(window, &ww, &wh);
+            float ndcX = (2.0f*(float)mx/ww)-1.0f;
+            float sliderLeft = 0.15f - 0.30f;
+            float sliderRight = 0.15f + 0.30f;
+            g_MasterVolume = (ndcX - sliderLeft) / (sliderRight - sliderLeft);
+            g_MasterVolume = std::max(0.0f, std::min(1.0f, g_MasterVolume));
+        }
+        // Setas de textura
+        if (g_HoverGramaL) g_TexturaPistaGrama = (g_TexturaPistaGrama + 2) % 3;
+        if (g_HoverGramaR) g_TexturaPistaGrama = (g_TexturaPistaGrama + 1) % 3;
+        if (g_HoverParedeL) g_TexturaPistaParede = (g_TexturaPistaParede + 2) % 3;
+        if (g_HoverParedeR) g_TexturaPistaParede = (g_TexturaPistaParede + 1) % 3;
+        if (g_HoverBolaL) g_TexturaBola = (g_TexturaBola + 2) % 3;
+        if (g_HoverBolaR) g_TexturaBola = (g_TexturaBola + 1) % 3;
+        if (g_HoverTacoL) g_TexturaTaco = (g_TexturaTaco + 2) % 3;
+        if (g_HoverTacoR) g_TexturaTaco = (g_TexturaTaco + 1) % 3;
+    }
+}
