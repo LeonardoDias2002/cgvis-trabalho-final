@@ -33,6 +33,9 @@ uniform mat4 projection;
 #define BANDEIRA 8
 #define HUD_BARRA 9
 #define GRAMA 10
+#define PISTALOOP 11
+#define BANDEIRA2 12
+
 uniform int object_id;
 uniform float u_ForcaPercent; // Usado para a barra de força
 

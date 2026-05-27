@@ -8,13 +8,6 @@
 //     CÓDIGO BASE PARA O TRABALHO FINAL
 //
 
-// Arquivos "headers" padrões de C podem ser incluídos em um
-// programa C++, sendo necessário somente adicionar o caractere
-// "c" antes de seu nome, e remover o sufixo ".h". Exemplo:
-//    #include <stdio.h> // Em C
-//  vira
-//    #include <cstdio> // Em C++
-//
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>
@@ -225,11 +218,14 @@ float g_TacoRotacaoVertical = 0.0f; // angulo rotação vertical do taco
 
 // Variáveis pra controlar a animação do taco
 double g_TempoRotacaoTaco = -1.0; // tempo de início da rotacao
-float g_DuracaoRotacaoTaco = 0.5f; // duração darotacao em segundos
-float g_AnguloRotacaoTaco = M_PI / 2.5f; // angulo máximo
+double g_TempoDesdeEspaco = 0.0; // tempo desde que a barra de espaço foi solta
+double g_TempoDesdeTacada = 0.0; // tempo desde o final da tacada
+float g_DuracaoRotacaoTaco = 0.5f; // duração da rotação em segundos
+float g_AnguloRotacaoTaco = M_PI / 2.5f; // ângulo máximo
 
 // Variáveis de física da bola
 glm::vec3 g_VelocidadeBola = glm::vec3(0.0f, 0.0f, 0.0f);
+bool g_BolaParada = true; // Indica se a bola está parada
 bool g_BolaNoBuraco = false;
 glm::mat4 g_BolaRotationMatrix = glm::mat4(1.0f); // Rotação acumulativa da bola
 
@@ -264,6 +260,21 @@ GLint g_bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+//Variáveis que controlam o jogo no modo Multiplayer
+bool g_MultiplayerAtivo = false;
+bool g_JogadorAtual = false;
+        //false = jogador 1
+        // true = jogador 2
+bool g_BolaNoBuracoTwo = false;
+bool g_TerminouJogada = false;
+bool g_BolaEmFocoAtual = false; // false = câmera segue bola 1, true = câmera segue bola 2
+
+glm::vec3 g_PosBolaTwo = glm::vec3(1.0f, 0.025f, -3.0f); //posição atual da bola de golfe do SEGUNDO jogadors
+glm::vec3 g_PosTacoTwo = glm::vec3(1.0f, 0.0f, -1.0f); // direção apontada pelo taco do SEGUNDO jogador
+glm::vec3 g_VelocidadeBolaTwo = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::mat4 g_BolaRotationMatrixTwo = glm::mat4(1.0f); // Rotação acumulativa da bola
+
 
 int main(int argc, char* argv[])
 {
@@ -403,8 +414,28 @@ int main(int argc, char* argv[])
         float delta_time = current_time - previous_time;
         previous_time = current_time;
 
+        if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS){
+            g_MultiplayerAtivo = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS){
+            g_JogadorAtual = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS){
+            g_JogadorAtual = false;
+        }
+
+        if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.001f && !g_BolaNoBuraco && 
+        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+            g_TerminouJogada = false; //reseta a variável para permitir a próxima jogada
+            g_JogadorAtual = true; // Muda para o próximo jogador (2)
+        } else if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.11f && !g_BolaNoBuraco && 
+        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+            g_TerminouJogada = false; 
+            g_JogadorAtual = false; 
+        }
+
         // Atualização da física da bola
-        if (!g_BolaNoBuraco) {
+        if (!g_BolaNoBuraco && !g_JogadorAtual) {
             glm::vec3 deslocamento = g_VelocidadeBola * delta_time;
             g_PosBola += deslocamento;
             
@@ -424,11 +455,11 @@ int main(int argc, char* argv[])
                 g_VelocidadeBola = glm::vec3(0.0f); // para completamente se estiver devagar
             }
 
-            // Limites da pista (paredes)
+            // Limites da pista (paredes) (colisão) (colisões)
             float track_width = 2.0f;
             float track_length = 5.0f;
             float ball_radius = 0.025f;
-
+            
             if (g_PosBola.x > track_width - ball_radius) { g_PosBola.x = track_width - ball_radius; g_VelocidadeBola.x *= -0.8f; }
             if (g_PosBola.x < -(track_width - ball_radius)) { g_PosBola.x = -(track_width - ball_radius); g_VelocidadeBola.x *= -0.8f; }
             if (g_PosBola.z > track_length - ball_radius) { g_PosBola.z = track_length - ball_radius; g_VelocidadeBola.z *= -0.8f; }
@@ -443,12 +474,56 @@ int main(int argc, char* argv[])
                 g_PosBola.z = hole_pos.z;
                 g_PosBola.y = -0.05f; // afunda no buraco
             }
+        } else if (!g_BolaNoBuracoTwo && g_JogadorAtual)
+        {
+            glm::vec3 deslocamento = g_VelocidadeBolaTwo * delta_time;
+            g_PosBolaTwo += deslocamento;
+            
+            float dist = glm::length(deslocamento);
+            if (dist > 0.0001f) {
+                float angle = dist / 0.025f; // O raio visual final agora é 0.025f
+
+                
+                glm::vec4 axis = glm::vec4(deslocamento.z, 0.0f, -deslocamento.x, 0.0f);
+                axis = axis / norm(axis);
+                g_BolaRotationMatrixTwo = Matrix_Rotate(angle, axis) * g_BolaRotationMatrixTwo;
+            }
+            
+            // Atrito simples
+            g_VelocidadeBolaTwo -= g_VelocidadeBolaTwo * 0.9f * delta_time;
+            if (glm::length(g_VelocidadeBolaTwo) < 0.05f) {
+                g_VelocidadeBolaTwo = glm::vec3(0.0f); // para completamente se estiver devagar
+            }
+
+            // Limites da pista (paredes)
+            float track_width = 2.0f;
+            float track_length = 5.0f;
+            float ball_radius = 0.025f;
+
+            if (g_PosBolaTwo.x > track_width - ball_radius) { g_PosBolaTwo.x = track_width - ball_radius; g_VelocidadeBolaTwo.x *= -0.8f; }
+            if (g_PosBolaTwo.x < -(track_width - ball_radius)) { g_PosBolaTwo.x = -(track_width - ball_radius); g_VelocidadeBolaTwo.x *= -0.8f; }
+            if (g_PosBolaTwo.z > track_length - ball_radius) { g_PosBolaTwo.z = track_length - ball_radius; g_VelocidadeBolaTwo.z *= -0.8f; }
+            if (g_PosBolaTwo.z < -(track_length - ball_radius)) { g_PosBolaTwo.z = -(track_length - ball_radius); g_VelocidadeBolaTwo.z *= -0.8f; }
+
+            // Buraco
+            glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
+            if (glm::length(glm::vec2(g_PosBolaTwo.x - hole_pos.x, g_PosBolaTwo.z - hole_pos.z)) < 0.15f) {
+                g_BolaNoBuracoTwo = true;
+                g_VelocidadeBolaTwo = glm::vec3(0.0f);
+                g_PosBolaTwo.x = hole_pos.x;
+                g_PosBolaTwo.z = hole_pos.z;
+                g_PosBolaTwo.y = -0.05f; // afunda no buraco
+            }
         }
+        
 
         // Aqui executamos as operações de renderização
         glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(g_GpuProgramID);
+
+        g_TempoDesdeTacada = glfwGetTime() - g_TempoDesdeEspaco;
+        //printf("Tempo desde a ultima tacada: %.2f \n", g_TempoDesdeTacada);
 
         // Calcular a força acumulada se a barra de espaço estiver sendo pressionada
         if (g_EspacoPressionado && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0) {
@@ -482,37 +557,71 @@ int main(int argc, char* argv[])
             // Aproximamos a câmera para o estilo 8 Ball Pool
             g_CameraDistance = 1.0f;
             float camera_height = 0.35f;
+            glm::vec4 camera_position_c  = glm::vec4( g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance, g_PosBola.y + camera_height, g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance, 1.0f );
+            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; 
+            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
 
-            glm::vec4 camera_position_c  = glm::vec4(
-                g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
-                g_PosBola.y + camera_height,
-                g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
-                1.0f
-            );
-            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-
+            if(!g_JogadorAtual){
+                camera_position_c  = glm::vec4(
+                    g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
+                    g_PosBola.y + camera_height,
+                    g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
+                    1.0f
+                );
+                camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
+                camera_view_vector = camera_lookat_l - camera_position_c; 
+            } else if(g_JogadorAtual){
+                camera_position_c  = glm::vec4(
+                    g_PosBolaTwo.x + cos(g_TacoRotacao) * g_CameraDistance,
+                    g_PosBolaTwo.y + camera_height,
+                    g_PosBolaTwo.z + sin(g_TacoRotacao) * g_CameraDistance,
+                    1.0f
+                );
+                camera_lookat_l    = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f); 
+                camera_view_vector = camera_lookat_l - camera_position_c; 
+                camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
+            }
             // Computamos a matriz "View" utilizando os parâmetros da câmera para
             // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
             view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
         }
         else{
+            if(!g_JogadorAtual){
+            
+                g_CameraDistance = 1.0f;
 
-            g_CameraDistance = 1.0f;
+                // Coordenadas esféricas
+                float camera_x = g_PosBola.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
+                float camera_y = g_PosBola.y + g_CameraDistance * sin(g_CameraPhi);
+                float camera_z = g_PosBola.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
 
-            // Coordenadas esféricas
-            float camera_x = g_PosBola.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
-            float camera_y = g_PosBola.y + g_CameraDistance * sin(g_CameraPhi);
-            float camera_z = g_PosBola.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
-
-            glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
-            glm::vec4 camera_lookat_l = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
-            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
-            glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
+                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
+                glm::vec4 camera_lookat_l = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
+                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
 
 
-            view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+
+            } else if(g_JogadorAtual) {
+
+                g_CameraDistance = 1.0f;
+
+                // Coordenadas esféricas
+                float camera_x = g_PosBolaTwo.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
+                float camera_y = g_PosBolaTwo.y + g_CameraDistance * sin(g_CameraPhi);
+                float camera_z = g_PosBolaTwo.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
+
+                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
+                glm::vec4 camera_lookat_l = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f);
+                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
+
+
+                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+
+            }
         }
 
 
@@ -571,6 +680,7 @@ int main(int argc, char* argv[])
         #define TRAJETORIA 6
         #define MASTRO 7
         #define BANDEIRA 8
+        #define HUD_BARRA 9
         #define GRAMA 10
         #define PISTALOOP 11
         #define BANDEIRA2 12
@@ -620,7 +730,9 @@ int main(int argc, char* argv[])
         glEnable(GL_CULL_FACE);
 
         // Trajetória da bola (renderizada apenas se estiver parada)
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
+        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && !g_JogadorAtual) {
+            
+            
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
             // Direção do arremesso: oposta ao taco
@@ -641,7 +753,32 @@ int main(int argc, char* argv[])
             model = Matrix_Translate(centro_raio.x, 0.01f, centro_raio.z) * Matrix_Rotate_Y(angulo_raio) * Matrix_Scale(0.02f, 1.0f, half_length);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             DrawVirtualObject("the_plane");
+
+        } else if (glm::length(g_VelocidadeBolaTwo) < 0.1f && !g_BolaNoBuraco && g_JogadorAtual) {
+
+            float cosseno = cos(g_TacoRotacao);
+            float seno = sin(g_TacoRotacao);
+            // Direção do arremesso: oposta ao taco
+            glm::vec3 dir_arremesso = glm::vec3(-cosseno, 0.0f, -seno);
+            
+            // Desenha um "tapete/raio" no chão correspondente à força carregada
+            float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f; // Força mínima ao mirar
+            float comp_trajetoria = forca_base * 0.2f; // escala da linha
+            
+            // O plano no the_plane tem tamanho 2x2. Uma escala Z de comp_trajetoria/2.0 faz o comprimento total = comp_trajetoria
+            float half_length = comp_trajetoria / 2.0f;
+            glm::vec3 centro_raio = g_PosBolaTwo + dir_arremesso * half_length;
+            
+            glUniform1i(g_object_id_uniform, TRAJETORIA);
+            // Rotaciona para apontar na direção do arremesso:
+            // arctan2(-x, -z) para rotacionar ao redor do Y
+            float angulo_raio = atan2(-dir_arremesso.x, -dir_arremesso.z);
+            model = Matrix_Translate(centro_raio.x, 0.01f, centro_raio.z) * Matrix_Rotate_Y(angulo_raio) * Matrix_Scale(0.02f, 1.0f, half_length);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            DrawVirtualObject("the_plane");
+
         }
+        
 
         // Buraco e Bandeira
         glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
@@ -665,7 +802,11 @@ int main(int argc, char* argv[])
 
         // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
         if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
-            model = CalcularTaco(g_PosBola, g_PosTaco, g_DistanciaTaco);
+            if(!g_JogadorAtual){
+                model = CalcularTaco(g_PosBola, g_PosTaco, g_DistanciaTaco);
+            } else if(g_JogadorAtual){
+                model = CalcularTaco(g_PosBolaTwo, g_PosTaco, g_DistanciaTaco);
+            }
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, TACO);
             DrawVirtualObject("golf_club.002_Cube.003");
@@ -678,6 +819,16 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BOLA);
         DrawVirtualObject("the_sphere");
+
+        if(g_MultiplayerAtivo){
+                // se MP ativo desenhamos a Bola do segundo jogador
+            model = Matrix_Translate(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z) 
+                * g_BolaRotationMatrix
+                * Matrix_Scale(0.025f, 0.025f, 0.025f); 
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BOLA);
+            DrawVirtualObject("the_sphere");
+        }
 
         // Desenha a Pista em loop
         model = Matrix_Translate(200.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
@@ -699,8 +850,6 @@ int main(int argc, char* argv[])
             glm::mat4 identity = Matrix_Identity();
             glUniformMatrix4fv(g_view_uniform, 1, GL_FALSE, glm::value_ptr(identity));
             glUniformMatrix4fv(g_projection_uniform, 1, GL_FALSE, glm::value_ptr(identity));
-            
-            #define HUD_BARRA 9
             glUniform1i(g_object_id_uniform, HUD_BARRA);
             
             float percent = std::min(g_ForcaTacada / 15.0f, 1.0f);
@@ -978,11 +1127,9 @@ void ComputeNormals(ObjModel* model)
                 const glm::vec4  a = vertices[0];
                 const glm::vec4  b = vertices[1];
                 const glm::vec4  c = vertices[2];
-
                 const glm::vec4  n = crossproduct(b-a,c-a);
 
-                for (size_t vertex = 0; vertex < 3; ++vertex)
-                {
+                for (size_t vertex = 0; vertex < 3; ++vertex) {
                     tinyobj::index_t idx = model->shapes[shape].mesh.indices[3*triangle + vertex];
                     num_triangles_per_vertex[idx.vertex_index] += 1;
                     vertex_normals[idx.vertex_index] += n;
@@ -1170,8 +1317,6 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), NULL, GL_STATIC_DRAW);
     glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indices.size() * sizeof(GLuint), indices.data());
     // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); // XXX Errado!
-    //
-
     // "Desligamos" o VAO, evitando assim que operações posteriores venham a
     // alterar o mesmo. Isso evita bugs.
     glBindVertexArray(0);
@@ -1236,7 +1381,13 @@ void RotacionarTaco(GLFWwindow* window)
             // Quando a rotação é 0, ele deve empurrar para frente (Z positivo ou negativo dependendo do eixo).
             // Em CalcularTaco, a posição usa: Z += seno*dist, X += cosseno*dist
             // Portanto a bola deve ir na direção oposta ao deslocamento.
-            g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
+            if(!g_JogadorAtual){
+                g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
+                g_BolaEmFocoAtual = false; // Câmera seguirá a bola 1
+            } else if(g_JogadorAtual){
+                g_VelocidadeBolaTwo = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
+                g_BolaEmFocoAtual = true; // Câmera seguirá a bola 2
+            }
         }
         return;
     }
@@ -1345,10 +1496,8 @@ void LoadShader(const char* filename, GLuint shader_id)
             output += log;
             output += "== End of compilation log\n";
         }
-
         fprintf(stderr, "%s", output.c_str());
     }
-
     // A chamada "delete" em C++ é equivalente ao "free()" do C
     delete [] log;
 }
@@ -1363,10 +1512,8 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id)
     // Definição dos dois shaders GLSL que devem ser executados pelo programa
     glAttachShader(program_id, vertex_shader_id);
     glAttachShader(program_id, fragment_shader_id);
-
     // Linkagem dos shaders acima ao programa
     glLinkProgram(program_id);
-
     // Verificamos se ocorreu algum erro durante a linkagem
     GLint linked_ok = GL_FALSE;
     glGetProgramiv(program_id, GL_LINK_STATUS, &linked_ok);
@@ -1399,7 +1546,6 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id)
     // Os "Shader Objects" podem ser marcados para deleção após serem linkados 
     glDeleteShader(vertex_shader_id);
     glDeleteShader(fragment_shader_id);
-
     // Retornamos o ID gerado acima
     return program_id;
 }
@@ -1419,7 +1565,6 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height)
     // altura), a qual será utilizada na definição das matrizes de projeção,
     // tal que não ocorra distorções durante o processo de "Screen Mapping"
     // acima, quando NDC é mapeado para coordenadas de pixels. Veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-    //
     // O cast para float é necessário pois números inteiros são arredondados ao
     // serem divididos!
     g_ScreenRatio = (float)width / height;
@@ -1433,8 +1578,7 @@ double g_LastCursorPosX, g_LastCursorPosY;
 // Função callback chamada sempre que o usuário aperta algum dos botões do mouse
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-    {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
         // posição atual do cursor nas variáveis g_LastCursorPosX e
         // g_LastCursorPosY.  Também, setamos a variável
@@ -1446,14 +1590,12 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         rotacao_camera = true; //habilitamos a rotação da camera   
 
     }
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
-    {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
         // variável abaixo para false.
         g_LeftMouseButtonPressed = false;
     }
-    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
-    {
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
         // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
         // posição atual do cursor nas variáveis g_LastCursorPosX e
         // g_LastCursorPosY.  Também, setamos a variável
@@ -1462,18 +1604,15 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_RightMouseButtonPressed = true;
 
-
         rotacao_camera = false; //desabilitamos a rotação da camera      
 
     }
-    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
-    {
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
         // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
         // variável abaixo para false.
         g_RightMouseButtonPressed = false;
     }
-    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS)
-    {
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
         // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
         // posição atual do cursor nas variáveis g_LastCursorPosX e
         // g_LastCursorPosY.  Também, setamos a variável
@@ -1482,8 +1621,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_MiddleMouseButtonPressed = true;
     }
-    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE)
-    {
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
         // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
         // variável abaixo para false.
         g_MiddleMouseButtonPressed = false;
@@ -1608,25 +1746,23 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
     // Lógica para controle da força com Espaço
-    if (key == GLFW_KEY_SPACE)
-    {
-        if (action == GLFW_PRESS && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0)
-        {
+    if (key == GLFW_KEY_SPACE) {
+
+        if (action == GLFW_PRESS && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0) {
             g_EspacoPressionado = true;
             g_InicioEspaco = glfwGetTime();
             g_ForcaTacada = 0.0f;
         }
-        else if (action == GLFW_RELEASE && g_EspacoPressionado)
-        {
-            g_EspacoPressionado = false;
-            // Inicia a animação da tacada
+        else if (action == GLFW_RELEASE && g_EspacoPressionado) {
+            g_EspacoPressionado = false; // Inicia a animação da tacada
             g_TempoRotacaoTaco = glfwGetTime();
+            g_TempoDesdeEspaco = g_TempoRotacaoTaco;
+            g_TerminouJogada = true; // Marca que a jogada terminou
         }
     }
 
     // Se o usuário apertar a tecla backspace, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
-    {
+    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
         g_AngleX = 0.0f;
         g_AngleY = 0.0f;
         g_AngleZ = 0.0f;
@@ -1639,26 +1775,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
-    if (key == GLFW_KEY_P && action == GLFW_PRESS)
-    {
+    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
         g_UsePerspectiveProjection = true;
     }
 
     // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
-    if (key == GLFW_KEY_O && action == GLFW_PRESS)
-    {
+    if (key == GLFW_KEY_O && action == GLFW_PRESS) {
         g_UsePerspectiveProjection = false;
     }
 
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
-    if (key == GLFW_KEY_H && action == GLFW_PRESS)
-    {
+    if (key == GLFW_KEY_H && action == GLFW_PRESS) {
         g_ShowInfoText = !g_ShowInfoText;
     }
 
     // Se o usuário apertar a tecla R, recarregamos os shaders dos arquivos "shader_fragment.glsl" e "shader_vertex.glsl".
-    if (key == GLFW_KEY_R && action == GLFW_PRESS)
-    {
+    if (key == GLFW_KEY_R && action == GLFW_PRESS) {
         LoadShadersFromFiles();
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
@@ -1764,8 +1896,7 @@ void TextRendering_ShowProjection(GLFWwindow* window)
         TextRendering_PrintString(window, "Orthographic", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
 }
 
-// Escrevemos na tela o número de quadros renderizados por segundo (frames per
-// second).
+// Escrevemos na tela o número de quadros renderizados por segundo (frames per second).
 void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
 {
     if ( !g_ShowInfoText )
@@ -1786,8 +1917,7 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
     // Número de segundos desde o último cálculo do fps
     float ellapsed_seconds = seconds - old_seconds;
 
-    if ( ellapsed_seconds > 1.0f )
-    {
+    if ( ellapsed_seconds > 1.0f ) {
         numchars = snprintf(buffer, 20, "%.2f fps", ellapsed_frames / ellapsed_seconds);
     
         old_seconds = seconds;
@@ -1805,14 +1935,16 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
             TextRendering_PrintString(window, "Mire com [A] / [D]. Zoom com [W] / [S]", -1.0f+charwidth, 1.0f-2.5f*lineheight, 1.2f);
             TextRendering_PrintString(window, "Mova a camera com o [M1]. Resetar com [M2]", -1.0f+charwidth, 1.0f-5.0f*lineheight, 1.2f);
             TextRendering_PrintString(window, "Segure [Espaco] para bater", -1.0f+charwidth, 1.0f-7.5f*lineheight, 1.2f);
+            if(!g_MultiplayerAtivo) TextRendering_PrintString(window, "Aperte [J] para ativar multiplayer", -1.0f+charwidth, 1.0f-10.0f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Tempo (debug): " + std::to_string((int)glfwGetTime()), -1.0f+charwidth, 1.0f-12.5f*lineheight, 1.2f);
+            TextRendering_PrintString(window, "Tempo desde tacada (debug): " + std::to_string((int)g_TempoDesdeTacada), -1.0f+charwidth, 1.0f-15.0f*lineheight, 1.2f);
         }
     }
-
 
     float lineheight_vitoria = TextRendering_LineHeight(window) * 3.0f;
     float charwidth_vitoria = TextRendering_CharWidth(window) * 3.0f;
 
-    if(g_BolaNoBuraco){
+    if(g_BolaNoBuraco) {
         TextRendering_PrintString(window, "Voce ganhou! Parabens!", -1.0f+charwidth_vitoria, 1.0f-7.5f*lineheight_vitoria, 4.2f);
     }
 }
