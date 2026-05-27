@@ -33,11 +33,17 @@ uniform mat4 projection;
 #define BANDEIRA 8
 #define HUD_BARRA 9
 #define GRAMA 10
+#define PISTA_CHAO 13
+#define PISTA_PAREDE 14
 #define PISTALOOP 11
 #define BANDEIRA2 12
 
 uniform int object_id;
 uniform float u_ForcaPercent; // Usado para a barra de força
+uniform int u_TexturaGramaPista;   // 0=rocky, 1=brick, 2=solid green
+uniform int u_TexturaParedesPista; // 0=rocky, 1=brick, 2=solid gray
+uniform int u_TexturaBola;         // 0=white, 1=brick, 2=rocky
+uniform int u_TexturaTaco;         // 0=metal, 1=textured, 2=brick
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
 uniform vec4 bbox_min;
@@ -153,13 +159,33 @@ void main()
     }
     else if ( object_id == TACO )
     {
-        Kd0 = vec3(0.7, 0.7, 0.7); // taco de metal
+        if (u_TexturaTaco == 0) {
+            Kd0 = vec3(0.7, 0.7, 0.7); // taco de metal (padrao)
+        } else if (u_TexturaTaco == 1) {
+            U = texcoords.x; V = texcoords.y;
+            Kd0 = texture(TextureImage2, vec2(U,V)).rgb; // textura golf club
+        } else {
+            U = texcoords.x; V = texcoords.y;
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo
+        }
         Ks = vec3(0.8, 0.8, 0.8);
         q = 32.0;
     }
     else if ( object_id == BOLA )
     {
-        Kd0 = vec3(1.0, 1.0, 1.0); // bola branca
+        vec4 bc = (bbox_min + bbox_max) / 2.0;
+        vec4 bd = position_model - bc;
+        float brho = length(bd);
+        float btheta = atan(bd.x, bd.z);
+        float bphi = asin(bd.y / brho);
+        U = (btheta + M_PI) / 2.0 / M_PI;
+        V = (bphi + M_PI_2) / M_PI;
+        if (u_TexturaBola == 0)
+            Kd0 = vec3(1.0, 1.0, 1.0); // branca (padrao)
+        else if (u_TexturaBola == 1)
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo
+        else
+            Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // rochoso
         Ks = vec3(0.5, 0.5, 0.5);
         q = 64.0;
     }
@@ -192,6 +218,28 @@ void main()
         Kd0 = vec3(0.1, 0.6, 0.1); // grama viva
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
+    }
+    else if ( object_id == PISTA_CHAO )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        if (u_TexturaGramaPista == 0)
+            Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // terreno rochoso (padrao)
+        else if (u_TexturaGramaPista == 1)
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo vermelho
+        else
+            Kd0 = vec3(0.2, 0.7, 0.2); // verde solido
+    }
+    else if ( object_id == PISTA_PAREDE )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        if (u_TexturaParedesPista == 0)
+            Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // terreno rochoso (padrao)
+        else if (u_TexturaParedesPista == 1)
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo vermelho
+        else
+            Kd0 = vec3(0.5, 0.5, 0.5); // cinza solido
     }
 
     if ( object_id == HUD_BARRA ) 
