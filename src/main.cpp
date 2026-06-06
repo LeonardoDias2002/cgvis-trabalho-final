@@ -480,12 +480,12 @@ int main(int argc, char* argv[])
             g_JogadorAtual = false;
         }
 
-        if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.001f && !g_BolaNoBuraco && 
-        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+        if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuraco && 
+        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
             g_TerminouJogada = false; //reseta a variável para permitir a próxima jogada
             g_JogadorAtual = true; // Muda para o próximo jogador (2)
         } else if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.11f && !g_BolaNoBuraco && 
-        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
             g_TerminouJogada = false; 
             g_JogadorAtual = false; 
         }
@@ -748,6 +748,9 @@ int main(int argc, char* argv[])
         #define BANDEIRA2 12
         #define PISTA_CHAO 13
         #define PISTA_PAREDE 14
+        #define ARVORE_ALTA 15
+        #define ARVORE_BAIXA 16
+        #define CACTUS 17
 
         // Desabilitamos Culling para desenhar as paredes de todos os lados
         glDisable(GL_CULL_FACE);
