@@ -751,6 +751,9 @@ int main(int argc, char* argv[])
         #define BANDEIRA2 12
         #define PISTA_CHAO 13
         #define PISTA_PAREDE 14
+        #define ARVORE_ALTA 15
+        #define ARVORE_BAIXA 16
+        #define CACTUS 17
 
         // Desabilitamos Culling para desenhar as paredes de todos os lados
         glDisable(GL_CULL_FACE);
