@@ -36,6 +36,9 @@ glm::mat4 view = Matrix_Camera_View(
     glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)
 );
 
+// Variável que controla o nível atual do jogo 
+int g_nivelAtual = 0;
+
 // --- Controle de antebraço/torso ---
 float g_ForearmAngleZ = 0.0f;
 float g_ForearmAngleX = 0.0f;

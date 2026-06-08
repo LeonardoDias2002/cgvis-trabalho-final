@@ -219,6 +219,9 @@ glm::mat4 view = Matrix_Camera_View(
     glm::vec4(0.0f, 1.0f, 0.0f, 0.0f) // vetor "up" da câmera
 );
 
+// Variável que controla o nível atual do jogo 
+int g_nivelAtual = 0;
+
 // Variáveis que controlam rotação do antebraço
 float g_ForearmAngleZ = 0.0f;
 float g_ForearmAngleX = 0.0f;
@@ -308,7 +311,7 @@ GLuint g_HudVBO = 0;
 GLuint g_LogoTextureID = 0;
 int g_LogoWidth = 1, g_LogoHeight = 1;
 // Hover states para botões do menu
-bool g_HoverJogar = false, g_HoverNiveis = false;
+bool g_HoverJogar = false, g_HoverMultiplayer = false;
 bool g_HoverConfig = false, g_HoverSair = false;
 bool g_HoverVoltar = false;
 bool g_HoverGramaL = false, g_HoverGramaR = false;
@@ -480,12 +483,12 @@ int main(int argc, char* argv[])
             g_JogadorAtual = false;
         }
 
-        if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.001f && !g_BolaNoBuraco && 
-        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+        if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuraco && 
+        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
             g_TerminouJogada = false; //reseta a variável para permitir a próxima jogada
             g_JogadorAtual = true; // Muda para o próximo jogador (2)
         } else if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.11f && !g_BolaNoBuraco && 
-        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 6.0f && g_TempoDesdeTacada > 3.0f) {
+        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
             g_TerminouJogada = false; 
             g_JogadorAtual = false; 
         }
@@ -2417,9 +2420,9 @@ void MenuRenderMainMenu(GLFWwindow* window)
     // Botões do menu principal
     float btnHW = 0.22f;
     float btnHH = 0.055f;
-    g_HoverJogar = RenderButton(window, 0.0f, 0.05f, btnHW, btnHH, "JOGAR",
+    g_HoverJogar = RenderButton(window, 0.0f, 0.05f, btnHW, btnHH, "1 JOGADOR",
         0.18f, 0.72f, 0.35f,  0.10f, 0.50f, 0.22f, true);
-    g_HoverNiveis = RenderButton(window, 0.0f, -0.10f, btnHW, btnHH, "NIVEIS",
+    g_HoverMultiplayer = RenderButton(window, 0.0f, -0.10f, btnHW, btnHH, "2 JOGADORES",
         0.25f, 0.50f, 0.85f,  0.15f, 0.35f, 0.65f, true);
     g_HoverConfig = RenderButton(window, 0.0f, -0.25f, btnHW, btnHH, "CONFIGURACOES",
         0.85f, 0.65f, 0.18f,  0.65f, 0.45f, 0.10f, true);
@@ -2685,14 +2688,12 @@ void MenuHandleClick(GLFWwindow* window)
 {
     if (g_CurrentState == MENU_MAIN) {
         if (g_HoverJogar) {
-            g_CurrentState = PLAYING;
-            g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
-            g_VelocidadeBola = glm::vec3(0.0f);
-            g_BolaNoBuraco = false;
-            g_BolaRotationMatrix = glm::mat4(1.0f);
-            g_TacoRotacao = 0.0f;
+            g_CurrentState = MENU_LEVELS;
         }
-        else if (g_HoverNiveis) g_CurrentState = MENU_LEVELS;
+        else if (g_HoverMultiplayer) {
+            g_CurrentState = MENU_LEVELS;
+            g_MultiplayerAtivo = true;
+        }
         else if (g_HoverConfig) g_CurrentState = MENU_SETTINGS;
         else if (g_HoverSair) glfwSetWindowShouldClose(window, GL_TRUE);
     }
@@ -2700,6 +2701,7 @@ void MenuHandleClick(GLFWwindow* window)
         if (g_HoverVoltar) g_CurrentState = MENU_MAIN;
         else if (IsMouseOverRect(window, -0.40f, 0.15f, 0.075f, 0.075f)) {
             g_CurrentState = PLAYING;
+            g_nivelAtual = 1;
             g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
             g_VelocidadeBola = glm::vec3(0.0f);
             g_BolaNoBuraco = false;
