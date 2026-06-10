@@ -29,14 +29,18 @@ uniform mat4 projection;
 #define BOLA   4
 #define BURACO 5
 #define TRAJETORIA 6
-#define MASTRO 7
-#define BANDEIRA 8
+
+
 #define HUD_BARRA 9
 #define GRAMA 10
 #define PISTALOOP 11
-#define BANDEIRA2 12
+#define BANDEIRA 12
 #define PISTA_CHAO 13
 #define PISTA_PAREDE 14
+#define ARVORE_ALTA 15
+#define ARVORE_BAIXA 16
+#define CACTUS 17
+#define PISTACURVA 18
 
 
 uniform int object_id;

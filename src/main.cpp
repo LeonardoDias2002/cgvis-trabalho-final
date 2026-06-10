@@ -174,6 +174,9 @@ void ProxNivel(GLFWwindow* window);
 void AtualizarFisicaBola(float delta_time);
 void AtualizarFisicaBolaTwo(float delta_time);
 
+// função para atualizar a posição da câmera
+void AtualizarCamera();
+
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
 struct SceneObject
@@ -454,13 +457,9 @@ int main(int argc, char* argv[])
     ComputeNormals(&ArvoreAltamodel);
     BuildTrianglesAndAddToVirtualScene(&ArvoreAltamodel);
 
-
-
-
-    if ( argc > 1 )
-    {
+    if ( argc > 1 ) {
         ObjModel model(argv[1]);
-        BuildTrianglesAndAddToVirtualScene(&model);
+        BuildTrianglesAndAddToVirtualScene(&model); 
     }
 
     // Inicializamos o código para renderização de texto.
@@ -473,13 +472,9 @@ int main(int argc, char* argv[])
     glEnable(GL_DEPTH_TEST);
 
     // Habilitamos o Backface Culling. Veja slides 8-13 do documento Aula_02_Fundamentos_Matematicos.pdf, slides 23-34 do documento Aula_13_Clipping_and_Culling.pdf e slides 112-123 do documento Aula_14_Laboratorio_3_Revisao.pdf.
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
+    glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(GL_CCW);
 
     float previous_time = (float)glfwGetTime();
-
-    float tempo_buraco = (float)glfwGetTime();
 
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
@@ -564,77 +559,7 @@ int main(int argc, char* argv[])
 
         RotacionarTaco(window);
         
-        if(!rotacao_camera){
-            // A câmera segue a bola mantendo o POV do golfista
-            // Aproximamos a câmera para o estilo 8 Ball Pool
-            g_CameraDistance = 1.0f;
-            float camera_height = 0.35f;
-            glm::vec4 camera_position_c  = glm::vec4( g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance, g_PosBola.y + camera_height, g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance, 1.0f );
-            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
-            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; 
-            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
-
-            if(!g_JogadorAtual){
-                camera_position_c  = glm::vec4(
-                    g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
-                    g_PosBola.y + camera_height,
-                    g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
-                    1.0f
-                );
-                camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
-                camera_view_vector = camera_lookat_l - camera_position_c; 
-            } else if(g_JogadorAtual){
-                camera_position_c  = glm::vec4(
-                    g_PosBolaTwo.x + cos(g_TacoRotacao) * g_CameraDistance,
-                    g_PosBolaTwo.y + camera_height,
-                    g_PosBolaTwo.z + sin(g_TacoRotacao) * g_CameraDistance,
-                    1.0f
-                );
-                camera_lookat_l    = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f); 
-                camera_view_vector = camera_lookat_l - camera_position_c; 
-                camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
-            }
-            // Computamos a matriz "View" utilizando os parâmetros da câmera para
-            // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-            view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-        }
-        else{
-            if(!g_JogadorAtual){
-            
-                g_CameraDistance = 1.0f;
-
-                // Coordenadas esféricas
-                float camera_x = g_PosBola.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
-                float camera_y = g_PosBola.y + g_CameraDistance * sin(g_CameraPhi);
-                float camera_z = g_PosBola.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
-
-                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
-                glm::vec4 camera_lookat_l = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
-                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
-                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
-
-
-                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-
-            } else if(g_JogadorAtual) {
-
-                g_CameraDistance = 1.0f;
-
-                // Coordenadas esféricas
-                float camera_x = g_PosBolaTwo.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
-                float camera_y = g_PosBolaTwo.y + g_CameraDistance * sin(g_CameraPhi);
-                float camera_z = g_PosBolaTwo.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
-
-                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
-                glm::vec4 camera_lookat_l = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f);
-                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
-                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
-
-
-                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-
-            }
-        }
+        AtualizarCamera();  
 
 
         // Agora computamos a matriz de Projeção.
@@ -1028,7 +953,6 @@ void DrawVirtualObject(const char* object_name)
 
 // Função que carrega os shaders de vértices e de fragmentos que serão
 // utilizados para renderização. Veja slides 180-200 do documento Aula_03_Rendering_Pipeline_Grafico.pdf.
-//
 void LoadShadersFromFiles()
 {
     // Note que o caminho para os arquivos "shader_vertex.glsl" e
@@ -2820,4 +2744,78 @@ void AtualizarFisicaBolaTwo(float delta_time){
         g_PosBolaTwo.z = hole_pos.z;
         g_PosBolaTwo.y = -0.05f; // afunda no buraco
     }
+}
+
+void AtualizarCamera(){
+    if(!rotacao_camera){
+            // A câmera segue a bola mantendo o POV do golfista
+            // Aproximamos a câmera para o estilo 8 Ball Pool
+            g_CameraDistance = 1.0f;
+            float camera_height = 0.35f;
+            glm::vec4 camera_position_c  = glm::vec4( g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance, g_PosBola.y + camera_height, g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance, 1.0f );
+            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; 
+            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
+
+            if(!g_JogadorAtual){
+                camera_position_c  = glm::vec4(
+                    g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance,
+                    g_PosBola.y + camera_height,
+                    g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
+                    1.0f
+                );
+                camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
+                camera_view_vector = camera_lookat_l - camera_position_c; 
+            } else if(g_JogadorAtual){
+                camera_position_c  = glm::vec4(
+                    g_PosBolaTwo.x + cos(g_TacoRotacao) * g_CameraDistance,
+                    g_PosBolaTwo.y + camera_height,
+                    g_PosBolaTwo.z + sin(g_TacoRotacao) * g_CameraDistance,
+                    1.0f
+                );
+                camera_lookat_l    = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f); 
+                camera_view_vector = camera_lookat_l - camera_position_c; 
+                camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
+            }
+            // Computamos a matriz "View" utilizando os parâmetros da câmera para
+            // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+            view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        }
+        else{
+            if(!g_JogadorAtual){
+            
+                g_CameraDistance = 1.0f;
+
+                // Coordenadas esféricas
+                float camera_x = g_PosBola.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
+                float camera_y = g_PosBola.y + g_CameraDistance * sin(g_CameraPhi);
+                float camera_z = g_PosBola.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
+
+                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
+                glm::vec4 camera_lookat_l = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
+                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
+
+
+                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+
+            } else if(g_JogadorAtual) {
+
+                g_CameraDistance = 1.0f;
+
+                // Coordenadas esféricas
+                float camera_x = g_PosBolaTwo.x + g_CameraDistance * cos(g_CameraPhi) * cos(g_CameraTheta);
+                float camera_y = g_PosBolaTwo.y + g_CameraDistance * sin(g_CameraPhi);
+                float camera_z = g_PosBolaTwo.z + g_CameraDistance * cos(g_CameraPhi) * sin(g_CameraTheta);
+
+                glm::vec4 camera_position_c = glm::vec4(camera_x, camera_y + 0.3f, camera_z, 1.0f);
+                glm::vec4 camera_lookat_l = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f);
+                glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+                glm::vec4 camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f);
+
+
+                view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+
+            }
+        }
 }
