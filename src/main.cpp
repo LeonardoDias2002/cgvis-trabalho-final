@@ -432,6 +432,23 @@ int main(int argc, char* argv[])
     ComputeNormals(&bandeiramodel);
     BuildTrianglesAndAddToVirtualScene(&bandeiramodel);
 
+    // Construímos a Pista cCurva
+    ObjModel PistaCurvamodel("../../data/PistaCurva.obj");
+    ComputeNormals(&PistaCurvamodel);
+    BuildTrianglesAndAddToVirtualScene(&PistaCurvamodel);
+
+    // ArVore Baixa
+    ObjModel ArvoreBaixamodel("../../data/ArvoreBaixa.obj");
+    ComputeNormals(&ArvoreBaixamodel);
+    BuildTrianglesAndAddToVirtualScene(&ArvoreBaixamodel);
+
+    // Arvore Alta 
+    ObjModel ArvoreAltamodel("../../data/ArvoreAlta.obj");
+    ComputeNormals(&ArvoreAltamodel);
+    BuildTrianglesAndAddToVirtualScene(&ArvoreAltamodel);
+
+
+
 
     if ( argc > 1 )
     {
@@ -444,7 +461,6 @@ int main(int argc, char* argv[])
 
     // Inicializamos o sistema de menu (HUD shader, logo, VAO/VBO)
     MenuInit();
-
 
     // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
     glEnable(GL_DEPTH_TEST);
@@ -471,16 +487,6 @@ int main(int argc, char* argv[])
             glfwSwapBuffers(window);
             glfwPollEvents();
             continue;
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS){
-            g_MultiplayerAtivo = true;
-        }
-        if (glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS){
-            g_JogadorAtual = true;
-        }
-        if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS){
-            g_JogadorAtual = false;
         }
 
         if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuraco && 
@@ -598,7 +604,7 @@ int main(int argc, char* argv[])
         }
 
         // Controle suave de mira do taco (apenas se a bola estiver parada)
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
+        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && !g_JogadorAtual) {
             float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
                 g_TacoRotacao += delta_mira;
@@ -606,12 +612,13 @@ int main(int argc, char* argv[])
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
                 g_TacoRotacao -= delta_mira;
             }
-        }
-
-        //teleporta pra proxima pista (debug)
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
-            if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
-                g_PosBola = glm::vec3(203.75f, 0.025f, -3.0f);
+        } else if (glm::length(g_VelocidadeBolaTwo) < 0.1f && !g_BolaNoBuraco && g_JogadorAtual) {
+            float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+                g_TacoRotacao += delta_mira;
+            }
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+                g_TacoRotacao -= delta_mira;
             }
         }
 
@@ -754,6 +761,7 @@ int main(int argc, char* argv[])
         #define ARVORE_ALTA 15
         #define ARVORE_BAIXA 16
         #define CACTUS 17
+        #define PISTACURVA 18
 
         // Desabilitamos Culling para desenhar as paredes de todos os lados
         glDisable(GL_CULL_FACE);
@@ -900,11 +908,39 @@ int main(int argc, char* argv[])
             DrawVirtualObject("the_sphere");
         }
 
+
+        // Desenha a pista curva
+        if(g_nivelAtual == 2){
+            model = Matrix_Translate(1.0f,1.0f,0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTACURVA);
+            DrawVirtualObject("Plane");
+        }
+
         // Desenha a Pista em loop
-        model = Matrix_Translate(200.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        if(g_nivelAtual == 3){
+            model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTALOOP);
+            DrawVirtualObject("loop");
+        }
+
+        // Desenha a vegetação
+        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PISTALOOP);
-        DrawVirtualObject("loop");
+        glUniform1i(g_object_id_uniform, ARVORE_ALTA);
+        DrawVirtualObject("Cube");
+
+        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, ARVORE_BAIXA);
+        DrawVirtualObject("Cube");
+
+        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CACTUS);
+        DrawVirtualObject("Plane");
+
 
         // Desenha a Bandeira
         /*model = Matrix_Translate(1.0f, 1.0f, 1.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
@@ -2026,9 +2062,6 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
             TextRendering_PrintString(window, "Mire com [A] / [D]. Zoom com [W] / [S]", -1.0f+charwidth, 1.0f-2.5f*lineheight, 1.2f);
             TextRendering_PrintString(window, "Mova a camera com o [M1]. Resetar com [M2]", -1.0f+charwidth, 1.0f-5.0f*lineheight, 1.2f);
             TextRendering_PrintString(window, "Segure [Espaco] para bater", -1.0f+charwidth, 1.0f-7.5f*lineheight, 1.2f);
-            if(!g_MultiplayerAtivo) TextRendering_PrintString(window, "Aperte [J] para ativar multiplayer", -1.0f+charwidth, 1.0f-10.0f*lineheight, 1.2f);
-            TextRendering_PrintString(window, "Tempo (debug): " + std::to_string((int)glfwGetTime()), -1.0f+charwidth, 1.0f-12.5f*lineheight, 1.2f);
-            TextRendering_PrintString(window, "Tempo desde tacada (debug): " + std::to_string((int)g_TempoDesdeTacada), -1.0f+charwidth, 1.0f-15.0f*lineheight, 1.2f);
         }
     }
 
