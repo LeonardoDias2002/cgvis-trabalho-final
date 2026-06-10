@@ -167,6 +167,8 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
+void ProxNivel(GLFWwindow* window); // função para avançar para o próximo nível
+
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
 struct SceneObject
@@ -350,7 +352,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - Gabriel & Leonardo - Seu Nome", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "INF01047 - Gabriel & Leonardo - Trabalho Final Computação Gráfica e Visualização", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -472,6 +474,8 @@ int main(int argc, char* argv[])
 
     float previous_time = (float)glfwGetTime();
 
+    float tempo_buraco = (float)glfwGetTime();
+
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -580,7 +584,12 @@ int main(int argc, char* argv[])
                 g_PosBolaTwo.y = -0.05f; // afunda no buraco
             }
         }
-        
+
+        // lógica de vitória e troca de níveis
+        if(!g_MultiplayerAtivo){
+            if(g_BolaNoBuraco) ProxNivel();
+        } else if(g_BolaNoBuraco && g_BolaNoBuracoTwo) ProxNivel();
+        }
 
         // Aqui executamos as operações de renderização
         glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
@@ -2768,5 +2777,17 @@ void MenuHandleClick(GLFWwindow* window)
         if (g_HoverBolaR) g_TexturaBola = (g_TexturaBola + 1) % 3;
         if (g_HoverTacoL) g_TexturaTaco = (g_TexturaTaco + 2) % 3;
         if (g_HoverTacoR) g_TexturaTaco = (g_TexturaTaco + 1) % 3;
+    }
+}
+
+void ProxNivel(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS){
+        g_nivelAtual++; // vai pro próximo nível
+        g_BolaNoBuraco = false; // reseta a(s) bola(s)
+        g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
+        g_VelocidadeBola = glm::vec3(0.0f);
+        g_BolaNoBuracoTwo = false;
+        g_PosBolaTwo = glm::vec3(1.0f, 0.025f, -3.0f);
+        g_VelocidadeBolaTwo = glm::vec3(0.0f);
     }
 }
