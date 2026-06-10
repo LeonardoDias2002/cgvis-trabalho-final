@@ -167,7 +167,12 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
-void ProxNivel(GLFWwindow* window); // função para avançar para o próximo nível
+// função para avançar para o próximo nível
+void ProxNivel(GLFWwindow* window); 
+
+// função para atualizar as posições das bolas de golfe
+void AtualizarFisicaBola(float delta_time);
+void AtualizarFisicaBolaTwo(float delta_time);
 
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
@@ -505,84 +510,10 @@ int main(int argc, char* argv[])
 
         // Atualização da física da bola
         if (!g_BolaNoBuraco && !g_JogadorAtual) {
-            glm::vec3 deslocamento = g_VelocidadeBola * delta_time;
-            g_PosBola += deslocamento;
-            
-            float dist = glm::length(deslocamento);
-            if (dist > 0.0001f) {
-                float angle = dist / 0.025f; // O raio visual final agora é 0.025f
-
-                
-                glm::vec4 axis = glm::vec4(deslocamento.z, 0.0f, -deslocamento.x, 0.0f);
-                axis = axis / norm(axis);
-                g_BolaRotationMatrix = Matrix_Rotate(angle, axis) * g_BolaRotationMatrix;
-            }
-            
-            // Atrito simples
-            g_VelocidadeBola -= g_VelocidadeBola * 0.9f * delta_time;
-            if (glm::length(g_VelocidadeBola) < 0.05f) {
-                g_VelocidadeBola = glm::vec3(0.0f); // para completamente se estiver devagar
-            }
-
-            // Limites da pista (paredes) (colisão) (colisões)
-            float track_width = 2.0f;
-            float track_length = 5.0f;
-            float ball_radius = 0.025f;
-            
-            if (g_PosBola.x > track_width - ball_radius) { g_PosBola.x = track_width - ball_radius; g_VelocidadeBola.x *= -0.8f; }
-            if (g_PosBola.x < -(track_width - ball_radius)) { g_PosBola.x = -(track_width - ball_radius); g_VelocidadeBola.x *= -0.8f; }
-            if (g_PosBola.z > track_length - ball_radius) { g_PosBola.z = track_length - ball_radius; g_VelocidadeBola.z *= -0.8f; }
-            if (g_PosBola.z < -(track_length - ball_radius)) { g_PosBola.z = -(track_length - ball_radius); g_VelocidadeBola.z *= -0.8f; }
-
-            // Buraco
-            glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
-            if (glm::length(glm::vec2(g_PosBola.x - hole_pos.x, g_PosBola.z - hole_pos.z)) < 0.15f) {
-                g_BolaNoBuraco = true;
-                g_VelocidadeBola = glm::vec3(0.0f);
-                g_PosBola.x = hole_pos.x;
-                g_PosBola.z = hole_pos.z;
-                g_PosBola.y = -0.05f; // afunda no buraco
-            }
+            AtualizarFisicaBola(delta_time);
         } else if (!g_BolaNoBuracoTwo && g_JogadorAtual)
         {
-            glm::vec3 deslocamento = g_VelocidadeBolaTwo * delta_time;
-            g_PosBolaTwo += deslocamento;
-            
-            float dist = glm::length(deslocamento);
-            if (dist > 0.0001f) {
-                float angle = dist / 0.025f; // O raio visual final agora é 0.025f
-
-                
-                glm::vec4 axis = glm::vec4(deslocamento.z, 0.0f, -deslocamento.x, 0.0f);
-                axis = axis / norm(axis);
-                g_BolaRotationMatrixTwo = Matrix_Rotate(angle, axis) * g_BolaRotationMatrixTwo;
-            }
-            
-            // Atrito simples
-            g_VelocidadeBolaTwo -= g_VelocidadeBolaTwo * 0.9f * delta_time;
-            if (glm::length(g_VelocidadeBolaTwo) < 0.05f) {
-                g_VelocidadeBolaTwo = glm::vec3(0.0f); // para completamente se estiver devagar
-            }
-
-            // Limites da pista (paredes)
-            float track_width = 2.0f;
-            float track_length = 5.0f;
-            float ball_radius = 0.025f;
-
-            if (g_PosBolaTwo.x > track_width - ball_radius) { g_PosBolaTwo.x = track_width - ball_radius; g_VelocidadeBolaTwo.x *= -0.8f; }
-            if (g_PosBolaTwo.x < -(track_width - ball_radius)) { g_PosBolaTwo.x = -(track_width - ball_radius); g_VelocidadeBolaTwo.x *= -0.8f; }
-            if (g_PosBolaTwo.z > track_length - ball_radius) { g_PosBolaTwo.z = track_length - ball_radius; g_VelocidadeBolaTwo.z *= -0.8f; }
-            if (g_PosBolaTwo.z < -(track_length - ball_radius)) { g_PosBolaTwo.z = -(track_length - ball_radius); g_VelocidadeBolaTwo.z *= -0.8f; }
-
-            // Buraco
-            glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
-            if (glm::length(glm::vec2(g_PosBolaTwo.x - hole_pos.x, g_PosBolaTwo.z - hole_pos.z)) < 0.15f) {
-                g_BolaNoBuracoTwo = true;
-                g_VelocidadeBolaTwo = glm::vec3(0.0f);
-                g_PosBolaTwo.x = hole_pos.x;
-                g_PosBolaTwo.z = hole_pos.z;
-                g_PosBolaTwo.y = -0.05f; // afunda no buraco
-            }
+            AtualizarFisicaBolaTwo(delta_time);
         }
 
         // lógica de vitória e troca de níveis
@@ -759,12 +690,12 @@ int main(int argc, char* argv[])
         #define BOLA   4
         #define BURACO 5
         #define TRAJETORIA 6
-        #define MASTRO 7
-        #define BANDEIRA 8
+
+
         #define HUD_BARRA 9
         #define GRAMA 10
         #define PISTALOOP 11
-        #define BANDEIRA2 12
+        #define BANDEIRA 12
         #define PISTA_CHAO 13
         #define PISTA_PAREDE 14
         #define ARVORE_ALTA 15
@@ -867,25 +798,13 @@ int main(int argc, char* argv[])
         }
         
 
-        // Buraco e Bandeira
+        // Buraco 
         glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
         // O buraco agora é menor e mais sutil
         model = Matrix_Translate(hole_pos.x, hole_pos.y + 0.01f, hole_pos.z) * Matrix_Scale(0.12f, 0.001f, 0.12f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BURACO);
         DrawVirtualObject("the_sphere");
-        
-        // Mastro da bandeira (Cilindro feito com a esfera achatada posicionado ao lado do buraco)
-        model = Matrix_Translate(hole_pos.x + 0.2f, hole_pos.y + 0.5f, hole_pos.z) * Matrix_Scale(0.015f, 0.5f, 0.015f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, MASTRO);
-        DrawVirtualObject("the_sphere");
-
-        // Tecido da bandeira (colado no lado do mastro)
-        model = Matrix_Translate(hole_pos.x + 0.35f, hole_pos.y + 0.8f, hole_pos.z) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.15f, 1.0f, 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, BANDEIRA);
-        DrawVirtualObject("the_plane");
 
         // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
         if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
@@ -952,10 +871,10 @@ int main(int argc, char* argv[])
 
 
         // Desenha a Bandeira
-        /*model = Matrix_Translate(1.0f, 1.0f, 1.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        model = Matrix_Translate(0.0f, 0.0f, 4.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, BANDEIRA2);
-        DrawVirtualObject("Cylinder");*/
+        glUniform1i(g_object_id_uniform, BANDEIRA);
+        DrawVirtualObject("Cylinder");
 
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
@@ -2789,5 +2708,116 @@ void ProxNivel(GLFWwindow* window) {
         g_BolaNoBuracoTwo = false;
         g_PosBolaTwo = glm::vec3(1.0f, 0.025f, -3.0f);
         g_VelocidadeBolaTwo = glm::vec3(0.0f);
+    }
+}
+
+void ApplyLoopCollision(glm::vec3& pos, glm::vec3& vel, float ball_radius)
+{
+    auto it = g_VirtualScene.find("loop");
+    if (it == g_VirtualScene.end())
+        return;
+
+    glm::vec3 translate = glm::vec3(1.0f, 1.0f, 0.0f);
+    glm::vec3 bbox_min = it->second.bbox_min + translate;
+    glm::vec3 bbox_max = it->second.bbox_max + translate;
+
+    float min_x = bbox_min.x + ball_radius;
+    float max_x = bbox_max.x - ball_radius;
+    float min_z = bbox_min.z + ball_radius;
+    float max_z = bbox_max.z - ball_radius;
+
+    if (pos.x < min_x) { pos.x = min_x; vel.x *= -0.8f; }
+    if (pos.x > max_x) { pos.x = max_x; vel.x *= -0.8f; }
+    if (pos.z < min_z) { pos.z = min_z; vel.z *= -0.8f; }
+    if (pos.z > max_z) { pos.z = max_z; vel.z *= -0.8f; }
+}
+
+void AtualizarFisicaBola(float delta_time) {
+    glm::vec3 deslocamento = g_VelocidadeBola * delta_time;
+    g_PosBola += deslocamento;
+    
+    float dist = glm::length(deslocamento);
+    if (dist > 0.0001f) {
+        float angle = dist / 0.025f; // O raio visual final agora é 0.025f
+
+        
+        glm::vec4 axis = glm::vec4(deslocamento.z, 0.0f, -deslocamento.x, 0.0f);
+        axis = axis / norm(axis);
+        g_BolaRotationMatrix = Matrix_Rotate(angle, axis) * g_BolaRotationMatrix;
+    }
+    
+    // Atrito simples
+    g_VelocidadeBola -= g_VelocidadeBola * 0.9f * delta_time;
+    if (glm::length(g_VelocidadeBola) < 0.05f) {
+        g_VelocidadeBola = glm::vec3(0.0f); // para completamente se estiver devagar
+    }
+
+    // Limites da pista (paredes) (colisão) (colisões)
+    float track_width = 2.0f;
+    float track_length = 5.0f;
+    float ball_radius = 0.025f;
+
+    if (g_nivelAtual == 3) {
+        ApplyLoopCollision(g_PosBola, g_VelocidadeBola, ball_radius);
+    } else {
+        if (g_PosBola.x > track_width - ball_radius) { g_PosBola.x = track_width - ball_radius; g_VelocidadeBola.x *= -0.8f; }
+        if (g_PosBola.x < -(track_width - ball_radius)) { g_PosBola.x = -(track_width - ball_radius); g_VelocidadeBola.x *= -0.8f; }
+        if (g_PosBola.z > track_length - ball_radius) { g_PosBola.z = track_length - ball_radius; g_VelocidadeBola.z *= -0.8f; }
+        if (g_PosBola.z < -(track_length - ball_radius)) { g_PosBola.z = -(track_length - ball_radius); g_VelocidadeBola.z *= -0.8f; }
+    }
+
+    // Buraco
+    glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
+    if (glm::length(glm::vec2(g_PosBola.x - hole_pos.x, g_PosBola.z - hole_pos.z)) < 0.15f) {
+        g_BolaNoBuraco = true;
+        g_VelocidadeBola = glm::vec3(0.0f);
+        g_PosBola.x = hole_pos.x;
+        g_PosBola.z = hole_pos.z;
+        g_PosBola.y = -0.05f; // afunda no buraco
+    }
+}
+
+void AtualizarFisicaBolaTwo(float delta_time){
+    glm::vec3 deslocamento = g_VelocidadeBolaTwo * delta_time;
+    g_PosBolaTwo += deslocamento;
+    
+    float dist = glm::length(deslocamento);
+    if (dist > 0.0001f) {
+        float angle = dist / 0.025f; // O raio visual final agora é 0.025f
+
+        
+        glm::vec4 axis = glm::vec4(deslocamento.z, 0.0f, -deslocamento.x, 0.0f);
+        axis = axis / norm(axis);
+        g_BolaRotationMatrixTwo = Matrix_Rotate(angle, axis) * g_BolaRotationMatrixTwo;
+    }
+    
+    // Atrito simples
+    g_VelocidadeBolaTwo -= g_VelocidadeBolaTwo * 0.9f * delta_time;
+    if (glm::length(g_VelocidadeBolaTwo) < 0.05f) {
+        g_VelocidadeBolaTwo = glm::vec3(0.0f); // para completamente se estiver devagar
+    }
+
+    // Limites da pista (paredes)
+    float track_width = 2.0f;
+    float track_length = 5.0f;
+    float ball_radius = 0.025f;
+
+    if (g_nivelAtual == 3) {
+        ApplyLoopCollision(g_PosBolaTwo, g_VelocidadeBolaTwo, ball_radius);
+    } else {
+        if (g_PosBolaTwo.x > track_width - ball_radius) { g_PosBolaTwo.x = track_width - ball_radius; g_VelocidadeBolaTwo.x *= -0.8f; }
+        if (g_PosBolaTwo.x < -(track_width - ball_radius)) { g_PosBolaTwo.x = -(track_width - ball_radius); g_VelocidadeBolaTwo.x *= -0.8f; }
+        if (g_PosBolaTwo.z > track_length - ball_radius) { g_PosBolaTwo.z = track_length - ball_radius; g_VelocidadeBolaTwo.z *= -0.8f; }
+        if (g_PosBolaTwo.z < -(track_length - ball_radius)) { g_PosBolaTwo.z = -(track_length - ball_radius); g_VelocidadeBolaTwo.z *= -0.8f; }
+    }
+
+    // Buraco
+    glm::vec3 hole_pos = glm::vec3(0.0f, 0.0f, 4.0f);
+    if (glm::length(glm::vec2(g_PosBolaTwo.x - hole_pos.x, g_PosBolaTwo.z - hole_pos.z)) < 0.15f) {
+        g_BolaNoBuracoTwo = true;
+        g_VelocidadeBolaTwo = glm::vec3(0.0f);
+        g_PosBolaTwo.x = hole_pos.x;
+        g_PosBolaTwo.z = hole_pos.z;
+        g_PosBolaTwo.y = -0.05f; // afunda no buraco
     }
 }
