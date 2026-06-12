@@ -11,20 +11,13 @@
 
 #include "globals.h"
 
-// =============================================
-// STRUCT DE SEGMENTO DE TRILHA
-// =============================================
-
-/**
- * @brief Representa um segmento individual da trilha.
- */
 struct TrailSegment
 {
     glm::vec3 posStart;   ///< Posição inicial do segmento
     glm::vec3 posEnd;     ///< Posição final do segmento
-    float opacity;        ///< Opacidade do segmento (desaparece gradualmente)
-    float maxAge;         ///< Tempo máximo de vida do segmento
-    float currentAge;     ///< Tempo de vida atual do segmento
+    float opacidade;        ///< Opacidade do segmento (desaparece gradualmente)
+    float tempoMax;         ///< Tempo máximo de vida do segmento
+    float tempoAtual;     ///< Tempo de vida atual do segmento
 };
 
 // =============================================
@@ -39,12 +32,12 @@ extern std::vector<TrailSegment> g_TrailSegmentsBola2;
 
 // Cores da trilha (RGBA)
 extern glm::vec3 g_TrailColor;           ///< Cor RGB da trilha (padrão: azul claro)
-extern float g_TrailOpacity;             ///< Opacidade da trilha (0.0 a 1.0)
+extern float g_Trailopacidade;             ///< Opacidade da trilha (0.0 a 1.0)
 
 // Configurações da trilha
 extern float g_TrailSegmentLength;       ///< Distância mínima para criar um novo segmento
-extern float g_TrailMaxAge;              ///< Tempo máximo de vida de um segmento em segundos
-extern float g_TrailThickness;           ///< Espessura do raio da trilha
+extern float g_TrailtempoMax;              ///< Tempo máximo de vida de um segmento em segundos
+extern float g_TrailThickness;           ///< Espessura do opacidade da trilha
 
 // =============================================
 // FUNÇÕES
@@ -104,8 +97,8 @@ void SetTrailColor(float r, float g, float b);
 
 /**
  * @brief Define a opacidade da trilha.
- * @param opacity Opacidade (0.0 a 1.0)
+ * @param opacidade Opacidade (0.0 a 1.0)
  */
-void SetTrailOpacity(float opacity);
+void SetTrailopacidade(float opacidade);
 
 #endif // TRAIL_H

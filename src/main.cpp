@@ -275,9 +275,6 @@ float field_of_view = M_PI / 3.0f;
 // Variável que controla se a camera está rotacionando (false = segue a bola, true = rotaciona com o mouse)
 bool rotacao_camera = false;
 
-// Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
-bool g_UsePerspectiveProjection = true;
-
 // Variável que controla se o texto informativo será mostrado na tela.
 bool g_ShowInfoText = true;
 
@@ -573,36 +570,18 @@ int main(int argc, char* argv[])
         float nearplane = -0.1f;  // Posição do "near plane"
         float farplane  = -10.0f; // Posição do "far plane"
 
-        if (g_UsePerspectiveProjection)
-        {
-            // Projeção Perspectiva.
-            // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-            
-            
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
-                field_of_view = field_of_view * 1.01f; //Taxa de zoom in
-            }
 
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && field_of_view > M_PI / 5.0f) { //Zoom out máximo (π/5 rad  = 36 graus)
-                field_of_view = field_of_view / 1.01f; //Taxa de zoom out
-            }
-
-            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-        }
-        else
-        {
-            // Projeção Ortográfica.
-            // Para definição dos valores l, r, b, t ("left", "right", "bottom", "top"),
-            // PARA PROJEÇÃO ORTOGRÁFICA veja slides 219-224 do documento Aula_09_Projecoes.pdf.
-            // Para simular um "zoom" ortográfico, computamos o valor de "t"
-            // utilizando a variável g_CameraDistance.
-            float t = 1.5f*g_CameraDistance/2.5f;
-            float b = -t;
-            float r = t*g_ScreenRatio;
-            float l = -r;
-            projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
+            field_of_view = field_of_view * 1.01f; //Taxa de zoom in
         }
 
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && field_of_view > M_PI / 5.0f) { //Zoom out máximo (π/5 rad  = 36 graus)
+            field_of_view = field_of_view / 1.01f; //Taxa de zoom out
+        }
+
+        projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
+    
+    
         glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
         // Enviamos as matrizes "view" e "projection" para a placa de vídeo
@@ -1760,28 +1739,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_TacoRotacaoVertical = 0.0f;
     }
 
-    // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
-    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-        g_UsePerspectiveProjection = true;
-    }
-
-    // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
-    if (key == GLFW_KEY_O && action == GLFW_PRESS) {
-        g_UsePerspectiveProjection = false;
-    }
-
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS) {
         g_ShowInfoText = !g_ShowInfoText;
     }
-
-    // Se o usuário apertar a tecla R, recarregamos os shaders dos arquivos "shader_fragment.glsl" e "shader_vertex.glsl".
-    if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-        LoadShadersFromFiles();
-        fprintf(stdout,"Shaders recarregados!\n");
-        fflush(stdout);
-    }
-
 }
 
 // Definimos o callback para impressão de erros da GLFW no terminal
@@ -1876,10 +1837,6 @@ void TextRendering_ShowProjection(GLFWwindow* window)
     float lineheight = TextRendering_LineHeight(window);
     float charwidth = TextRendering_CharWidth(window);
 
-    if ( g_UsePerspectiveProjection )
-        TextRendering_PrintString(window, "Perspective", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
-    else
-        TextRendering_PrintString(window, "Orthographic", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
 }
 
 // Escrevemos na tela o número de quadros renderizados por segundo (frames per second).
