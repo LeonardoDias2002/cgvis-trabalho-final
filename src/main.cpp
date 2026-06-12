@@ -42,6 +42,7 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+#include "trail.h"
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -493,7 +494,7 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuraco && 
+        if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuracoTwo && 
         !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
             g_TerminouJogada = false; //reseta a variável para permitir a próxima jogada
             g_JogadorAtual = true; // Muda para o próximo jogador (2)
@@ -506,10 +507,21 @@ int main(int argc, char* argv[])
         // Atualização da física da bola
         if (!g_BolaNoBuraco && !g_JogadorAtual) {
             AtualizarFisicaBola(delta_time);
+            // Atualiza a trilha da bola 1
+            if (glm::length(g_VelocidadeBola) > 0.01f) {
+                UpdateTrail(g_PosBola, g_LastTrailPosBola, delta_time);
+            }
         } else if (!g_BolaNoBuracoTwo && g_JogadorAtual)
         {
             AtualizarFisicaBolaTwo(delta_time);
+            // Atualiza a trilha da bola 2
+            if (glm::length(g_VelocidadeBolaTwo) > 0.01f) {
+                UpdateTrail2(g_PosBolaTwo, g_LastTrailPosBola2, delta_time);
+            }
         }
+        
+        // Atualiza a idade dos segmentos de trilha
+        UpdateTrailSegments(delta_time);
 
         // lógica de vitória e troca de níveis
         if(!g_MultiplayerAtivo){
@@ -539,15 +551,7 @@ int main(int argc, char* argv[])
         }
 
         // Controle suave de mira do taco (apenas se a bola estiver parada)
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && !g_JogadorAtual) {
-            float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-                g_TacoRotacao += delta_mira;
-            }
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-                g_TacoRotacao -= delta_mira;
-            }
-        } else if (glm::length(g_VelocidadeBolaTwo) < 0.1f && !g_BolaNoBuraco && g_JogadorAtual) {
+        if ((glm::length(g_VelocidadeBola) < 0.1f) && (glm::length(g_VelocidadeBolaTwo) < 0.1f) && !g_BolaNoBuraco || !g_BolaNoBuracoTwo) {
             float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
                 g_TacoRotacao += delta_mira;
@@ -557,10 +561,9 @@ int main(int argc, char* argv[])
             }
         }
 
-        RotacionarTaco(window);
+        RotacionarTaco(window); // chamamos a função que rotaciona o taco
         
-        AtualizarCamera();  
-
+        AtualizarCamera(); // chamamos a função que atualiza a câmera
 
         // Agora computamos a matriz de Projeção.
         glm::mat4 projection;
@@ -730,6 +733,13 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BURACO);
         DrawVirtualObject("the_sphere");
+
+        // Renderiza a trilha da bola
+        glUseProgram(g_GpuProgramID);
+        RenderTrail();
+        if (g_MultiplayerAtivo) {
+            RenderTrail2();
+        }
 
         // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
         if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
@@ -1668,10 +1678,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 }
 
 // Função callback chamada sempre que o usuário movimenta a "rodinha" do mouse.
-void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-{
-    // O Zoom foi intencionalmente desabilitado para manter a visão fixa de POV do golfista.
-}
+void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset){}
 
 void Correcao_KeyCallback(int key, int action, int mod);
 
@@ -2698,6 +2705,7 @@ void AtualizarFisicaBola(float delta_time) {
         g_PosBola.x = hole_pos.x;
         g_PosBola.z = hole_pos.z;
         g_PosBola.y = -0.05f; // afunda no buraco
+        ClearTrail();  // Limpa a trilha quando a bola entra no buraco
     }
 }
 
@@ -2743,6 +2751,7 @@ void AtualizarFisicaBolaTwo(float delta_time){
         g_PosBolaTwo.x = hole_pos.x;
         g_PosBolaTwo.z = hole_pos.z;
         g_PosBolaTwo.y = -0.05f; // afunda no buraco
+        ClearTrail2();  // Limpa a trilha quando a bola entra no buraco
     }
 }
 

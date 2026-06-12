@@ -130,3 +130,15 @@ bool g_HoverTacoL = false, g_HoverTacoR = false;
 
 // --- Posição do cursor ---
 double g_LastCursorPosX, g_LastCursorPosY;
+
+// --- Sistema de Trilha da Bola ---
+std::vector<TrailSegment> g_TrailSegmentsBola;
+std::vector<TrailSegment> g_TrailSegmentsBola2;
+glm::vec3 g_TrailColor = glm::vec3(0.3f, 0.7f, 1.0f);    // Azul claro (RGB)
+float g_TrailOpacity = 0.6f;                              // 60% de opacidade
+float g_TrailSegmentLength = 0.05f;                       // Distância mínima para novo segmento (5cm)
+float g_TrailMaxAge = 1.5f;                               // Duração máxima da trilha (1.5 segundos)
+float g_TrailThickness = 0.008f;                          // Espessura do raio (8mm)
+glm::vec3 g_LastTrailPosBola = glm::vec3(0.0f);           // Última posição registrada da trilha
+glm::vec3 g_LastTrailPosBola2 = glm::vec3(0.0f);          // Última posição registrada da trilha (bola 2)
+
