@@ -135,12 +135,12 @@ struct SceneObject
 #define BOLA       4
 #define BURACO     5
 #define TRAJETORIA 6
-#define MASTRO     7
-#define BANDEIRA   8
+
+
 #define HUD_BARRA  9
 #define GRAMA      10
 #define PISTALOOP  11
-#define BANDEIRA2  12
+#define BANDEIRA  12
 #define PISTA_CHAO   13
 #define PISTA_PAREDE 14
 
@@ -272,5 +272,24 @@ extern double g_LastCursorPosX, g_LastCursorPosY;
 
 // --- Shader de texto (definido em textrendering.cpp) ---
 extern GLuint textprogram_id;
+
+// --- Sistema de Trilha da Bola ---
+struct TrailSegment {
+    glm::vec3 posStart;
+    glm::vec3 posEnd;
+    float opacity;
+    float maxAge;
+    float currentAge;
+};
+
+extern std::vector<TrailSegment> g_TrailSegmentsBola;
+extern std::vector<TrailSegment> g_TrailSegmentsBola2;
+extern glm::vec3 g_TrailColor;
+extern float g_TrailOpacity;
+extern float g_TrailSegmentLength;
+extern float g_TrailMaxAge;
+extern float g_TrailThickness;
+extern glm::vec3 g_LastTrailPosBola;
+extern glm::vec3 g_LastTrailPosBola2;
 
 #endif // GLOBALS_H

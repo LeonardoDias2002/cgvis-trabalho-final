@@ -29,14 +29,18 @@ uniform mat4 projection;
 #define BOLA   4
 #define BURACO 5
 #define TRAJETORIA 6
-#define MASTRO 7
-#define BANDEIRA 8
+
+
 #define HUD_BARRA 9
 #define GRAMA 10
 #define PISTALOOP 11
-#define BANDEIRA2 12
+#define BANDEIRA 12
 #define PISTA_CHAO 13
 #define PISTA_PAREDE 14
+#define ARVORE_ALTA 15
+#define ARVORE_BAIXA 16
+#define CACTUS 17
+#define PISTACURVA 18
 
 
 uniform int object_id;
@@ -45,6 +49,8 @@ uniform int u_TexturaGramaPista;   // 0=rocky, 1=brick, 2=solid green
 uniform int u_TexturaParedesPista; // 0=rocky, 1=brick, 2=solid gray
 uniform int u_TexturaBola;         // 0=white, 1=brick, 2=rocky
 uniform int u_TexturaTaco;         // 0=metal, 1=textured, 2=brick
+uniform vec3 u_TrailColor;         // Cor da trilha (RGB)
+uniform float u_TrailOpacity;      // Opacidade da trilha (0.0 a 1.0)
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
 uniform vec4 bbox_min;
@@ -198,7 +204,7 @@ void main()
     }
     else if ( object_id == TRAJETORIA )
     {
-        Kd0 = vec3(1.0, 1.0, 1.0); // bolinhas de mira brancas
+        Kd0 = u_TrailColor;  // Usa a cor da trilha do uniform
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }

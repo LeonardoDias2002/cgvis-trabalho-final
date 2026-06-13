@@ -12,6 +12,8 @@ set(SOURCES
   src/tiny_obj_loader.cpp
   src/stb_image.cpp
   src/glad.c
+  src/globals.cpp
+  src/trail.cpp
 )
 
 if(WIN32)
@@ -20,8 +22,6 @@ if(WIN32)
 endif()
 
 cmake_minimum_required(VERSION 3.10)
-
-project(LAB_FCG VERSION 1.0.0)
 
 project(LAB_FCG VERSION 1.0.0)
 

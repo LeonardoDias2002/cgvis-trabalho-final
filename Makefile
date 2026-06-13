@@ -8,3 +8,4 @@ clean:
 
 run: ./bin/Linux/main
 	cd bin/Linux && ./main
+	
