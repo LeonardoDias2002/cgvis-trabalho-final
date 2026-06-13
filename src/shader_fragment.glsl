@@ -29,12 +29,12 @@ uniform mat4 projection;
 #define BOLA   4
 #define BURACO 5
 #define TRAJETORIA 6
-
-
+#define BANDEIRA 7
+#define MASTRO 8
 #define HUD_BARRA 9
 #define GRAMA 10
 #define PISTALOOP 11
-#define BANDEIRA 12
+
 #define PISTA_CHAO 13
 #define PISTA_PAREDE 14
 #define ARVORE_ALTA 15
@@ -207,12 +207,6 @@ void main()
         Kd0 = u_TrailColor;  // Usa a cor da trilha do uniform
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
-    }
-    else if ( object_id == MASTRO )
-    {
-        Kd0 = vec3(0.8, 0.8, 0.8); // cinza prateado
-        Ks = vec3(0.5, 0.5, 0.5);
-        q = 32.0;
     }
     else if ( object_id == BANDEIRA )
     {

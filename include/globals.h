@@ -42,28 +42,27 @@
 // STRUCTS
 // =============================================
 
-/**
- * @brief Representa um modelo geométrico carregado de um arquivo ".obj".
- *
- * Usa a biblioteca tinyobjloader para parsear vértices, normais, texturas
- * e materiais. Veja: https://en.wikipedia.org/wiki/Wavefront_.obj_file
- */
+/*
+Representa um modelo geométrico carregado de um arquivo ".obj".
+Usa a biblioteca tinyobjloader para parsear vértices, normais, texturas
+e materiais. Veja: https://en.wikipedia.org/wiki/Wavefront_.obj_file
+Estrutura que representa um modelo geométrico carregado a partir de um
+arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file . */
 struct ObjModel
 {
     tinyobj::attrib_t                 attrib;
     std::vector<tinyobj::shape_t>     shapes;
     std::vector<tinyobj::material_t>  materials;
 
-    /**
-     * @brief Construtor que carrega um modelo .obj do disco.
-     * @param filename  Caminho para o arquivo .obj
-     * @param basepath  Diretório base para resolver arquivos .mtl (NULL = dirname do filename)
-     * @param triangulate Se true, triangula faces com mais de 3 vértices
-     */
+    // Este construtor lê o modelo de um arquivo utilizando a biblioteca tinyobjloader.
+    // Veja: https://github.com/syoyo/tinyobjloader
     ObjModel(const char* filename, const char* basepath = NULL, bool triangulate = true)
     {
         printf("Carregando objetos do arquivo \"%s\"...\n", filename);
 
+        // Se basepath == NULL, então setamos basepath como o dirname do
+        // filename, para que os arquivos MTL sejam corretamente carregados caso
+        // estejam no mesmo diretório dos arquivos OBJ.
         std::string fullpath(filename);
         std::string dirname;
         if (basepath == NULL)
@@ -105,12 +104,10 @@ struct ObjModel
     }
 };
 
-/**
- * @brief Dados necessários para renderizar um objeto da cena virtual.
- *
- * Cada SceneObject armazena o nome, intervalo de índices no VBO,
- * modo de rasterização e a bounding box (AABB) do modelo.
- */
+
+/*
+Cada SceneObject armazena o nome, intervalo de índices no VBO,
+modo de rasterização e a bounding box (AABB) do modelo. */
 struct SceneObject
 {
     std::string  name;                  ///< Nome do objeto
@@ -148,7 +145,7 @@ struct SceneObject
 // ENUM DE ESTADO DO JOGO
 // =============================================
 
-/** @brief Estados possíveis do jogo (menu ou gameplay). */
+
 enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING };
 
 // =============================================
@@ -157,9 +154,7 @@ enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING };
 
 // --- Cena Virtual e Pilha de Matrizes ---
 extern std::map<std::string, SceneObject> g_VirtualScene;
-extern std::stack<glm::mat4>  g_MatrixStack;
-
-// --- Janela ---
+extern std::stack<glm::mat4> g_MatrixStack;
 extern float g_ScreenRatio;
 
 // --- Ângulos de Euler (rotação de objetos de debug) ---
@@ -177,6 +172,9 @@ extern float g_CameraTheta;
 extern float g_CameraPhi;
 extern float g_CameraDistance;
 extern glm::mat4 view;
+
+// Variável que controla o nível atual do jogo 
+extern int g_nivelAtual;
 
 // --- Controle de antebraço/torso (do código base da disciplina) ---
 extern float g_ForearmAngleZ;
@@ -259,7 +257,7 @@ extern GLuint g_LogoTextureID;
 extern int g_LogoWidth, g_LogoHeight;
 
 // --- Hover States dos Botões do Menu ---
-extern bool g_HoverJogar, g_HoverNiveis;
+extern bool g_HoverJogar, g_HoverMultiplayer;
 extern bool g_HoverConfig, g_HoverSair;
 extern bool g_HoverVoltar;
 extern bool g_HoverGramaL, g_HoverGramaR;
@@ -274,22 +272,27 @@ extern double g_LastCursorPosX, g_LastCursorPosY;
 extern GLuint textprogram_id;
 
 // --- Sistema de Trilha da Bola ---
-struct TrailSegment {
-    glm::vec3 posStart;
-    glm::vec3 posEnd;
-    float opacity;
-    float maxAge;
-    float currentAge;
+struct TrailSegment
+{
+    glm::vec3 posStart;   ///< Posição inicial do segmento
+    glm::vec3 posEnd;     ///< Posição final do segmento
+    float opacidade;        ///< Opacidade do segmento (desaparece gradualmente)
+    float tempoMax;         ///< Tempo máximo de vida do segmento
+    float tempoAtual;     ///< Tempo de vida atual do segmento
 };
 
 extern std::vector<TrailSegment> g_TrailSegmentsBola;
 extern std::vector<TrailSegment> g_TrailSegmentsBola2;
 extern glm::vec3 g_TrailColor;
-extern float g_TrailOpacity;
+extern float g_Trailopacidade;
 extern float g_TrailSegmentLength;
-extern float g_TrailMaxAge;
+extern float g_TrailtempoMax;
 extern float g_TrailThickness;
 extern glm::vec3 g_LastTrailPosBola;
 extern glm::vec3 g_LastTrailPosBola2;
+
+
+void DrawVirtualObject(const char* object_name);
+
 
 #endif // GLOBALS_H

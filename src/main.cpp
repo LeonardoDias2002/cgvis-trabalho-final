@@ -43,64 +43,7 @@
 #include "utils.h"
 #include "matrices.h"
 #include "trail.h"
-
-// Estrutura que representa um modelo geométrico carregado a partir de um
-// arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
-struct ObjModel
-{
-    tinyobj::attrib_t                 attrib;
-    std::vector<tinyobj::shape_t>     shapes;
-    std::vector<tinyobj::material_t>  materials;
-
-    // Este construtor lê o modelo de um arquivo utilizando a biblioteca tinyobjloader.
-    // Veja: https://github.com/syoyo/tinyobjloader
-    ObjModel(const char* filename, const char* basepath = NULL, bool triangulate = true)
-    {
-        printf("Carregando objetos do arquivo \"%s\"...\n", filename);
-
-        // Se basepath == NULL, então setamos basepath como o dirname do
-        // filename, para que os arquivos MTL sejam corretamente carregados caso
-        // estejam no mesmo diretório dos arquivos OBJ.
-        std::string fullpath(filename);
-        std::string dirname;
-        if (basepath == NULL)
-        {
-            auto i = fullpath.find_last_of("/");
-            if (i != std::string::npos)
-            {
-                dirname = fullpath.substr(0, i+1);
-                basepath = dirname.c_str();
-            }
-        }
-
-        std::string warn;
-        std::string err;
-        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename, basepath, triangulate);
-
-        if (!err.empty())
-            fprintf(stderr, "\n%s\n", err.c_str());
-
-        if (!ret)
-            throw std::runtime_error("Erro ao carregar modelo.");
-
-        for (size_t shape = 0; shape < shapes.size(); ++shape)
-        {
-            if (shapes[shape].name.empty())
-            {
-                fprintf(stderr,
-                        "*********************************************\n"
-                        "Erro: Objeto sem nome dentro do arquivo '%s'.\n"
-                        "Veja https://www.inf.ufrgs.br/~eslgastal/fcg-faq-etc.html#Modelos-3D-no-formato-OBJ .\n"
-                        "*********************************************\n",
-                    filename);
-                throw std::runtime_error("Objeto sem nome.");
-            }
-            printf("- Objeto '%s'\n", shapes[shape].name.c_str());
-        }
-
-        printf("OK.\n");
-    }
-};
+#include "globals.h"
 
 
 // Declaração de funções utilizadas para pilha de matrizes de modelagem.
@@ -178,154 +121,6 @@ void AtualizarFisicaBolaTwo(float delta_time);
 // função para atualizar a posição da câmera
 void AtualizarCamera();
 
-// Definimos uma estrutura que armazenará dados necessários para renderizar
-// cada objeto da cena virtual.
-struct SceneObject
-{
-    std::string  name;        // Nome do objeto
-    size_t       first_index; // Índice do primeiro vértice dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    size_t       num_indices; // Número de índices do objeto dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    GLenum       rendering_mode; // Modo de rasterização (GL_TRIANGLES, GL_TRIANGLE_STRIP, etc.)
-    GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
-    glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
-    glm::vec3    bbox_max;
-};
-
-// Abaixo definimos variáveis globais utilizadas em várias funções do código.
-
-// A cena virtual é uma lista de objetos nomeados, guardados em um dicionário
-// (map).  Veja dentro da função BuildTrianglesAndAddToVirtualScene() como que são incluídos
-// objetos dentro da variável g_VirtualScene, e veja na função main() como
-// estes são acessados.
-std::map<std::string, SceneObject> g_VirtualScene;
-
-// Pilha que guardará as matrizes de modelagem.
-std::stack<glm::mat4>  g_MatrixStack;
-
-// Razão de proporção da janela (largura/altura). Veja função FramebufferSizeCallback().
-float g_ScreenRatio = 1.0f;
-
-// Ângulos de Euler que controlam a rotação de um dos cubos da cena virtual
-float g_AngleX = 0.0f;
-float g_AngleY = 0.0f;
-float g_AngleZ = 0.0f;
-
-// "g_LeftMouseButtonPressed = true" se o usuário está com o botão esquerdo do mouse
-// pressionado no momento atual. Veja função MouseButtonCallback().
-bool g_LeftMouseButtonPressed = false;
-bool g_RightMouseButtonPressed = false; // Análogo para botão direito do mouse
-bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mouse
-
-// Variáveis que definem a câmera em coordenadas esféricas, controladas pelo
-// usuário através do mouse (veja função CursorPosCallback()). A posição
-// efetiva da câmera é calculada dentro da função main(), dentro do loop de
-// renderização.
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.5f; // Distância da câmera para a origem
-
-glm::mat4 view = Matrix_Camera_View(
-    glm::vec4(0.0f, 0.0f, 3.5f, 1.0f), // posição da câmera
-    glm::vec4(0.0f, 0.0f, -1.0f, 0.0f), // direção para onde a câmera aponta
-    glm::vec4(0.0f, 1.0f, 0.0f, 0.0f) // vetor "up" da câmera
-);
-
-// Variável que controla o nível atual do jogo 
-int g_nivelAtual = 0;
-
-// Variáveis que controlam rotação do antebraço
-float g_ForearmAngleZ = 0.0f;
-float g_ForearmAngleX = 0.0f;
-
-// Variáveis que controlam translação do torso
-float g_TorsoPositionX = 0.0f;
-float g_TorsoPositionY = 0.0f;
-
-// Variáveis que rastreiam as posições da bola e taco de golfe (vou usar para posicionar o taco atrás da bola)
-glm::vec3 g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f); //posição atual da bola de golfe
-glm::vec3 g_PosTaco = glm::vec3(0.0f, 0.0f, -1.0f); // direção apontada pelo taco
-float g_DistanciaTaco = 0.2f; // distância entre o taco e a bola
-float g_TacoRotacao = 0.0f; // angulo rotação do taco 
-float g_TacoRotacaoVertical = 0.0f; // angulo rotação vertical do taco
-
-// Variáveis pra controlar a animação do taco
-double g_TempoRotacaoTaco = -1.0; // tempo de início da rotacao
-double g_TempoDesdeEspaco = 0.0; // tempo desde que a barra de espaço foi solta
-double g_TempoDesdeTacada = 0.0; // tempo desde o final da tacada
-float g_DuracaoRotacaoTaco = 0.5f; // duração da rotação em segundos
-float g_AnguloRotacaoTaco = M_PI / 2.5f; // ângulo máximo
-
-// Variáveis de física da bola
-glm::vec3 g_VelocidadeBola = glm::vec3(0.0f, 0.0f, 0.0f);
-bool g_BolaParada = true; // Indica se a bola está parada
-bool g_BolaNoBuraco = false;
-glm::mat4 g_BolaRotationMatrix = glm::mat4(1.0f); // Rotação acumulativa da bola
-
-// Variáveis para a mecânica de força da tacada
-bool g_EspacoPressionado = false;
-double g_InicioEspaco = 0.0;
-float g_ForcaTacada = 0.0f;
-
-//Posição da luz pontual
-glm::vec3 g_PosLuz(0.0f, 10.0f, 0.0f);
-
-// Variável que define o Field of View (FOV)
-float field_of_view = M_PI / 3.0f;
-
-// Variável que controla se a camera está rotacionando (false = segue a bola, true = rotaciona com o mouse)
-bool rotacao_camera = false;
-
-// Variável que controla se o texto informativo será mostrado na tela.
-bool g_ShowInfoText = true;
-
-// Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
-GLuint g_GpuProgramID = 0;
-GLint g_model_uniform;
-GLint g_view_uniform;
-GLint g_projection_uniform;
-GLint g_object_id_uniform;
-GLint g_bbox_min_uniform;
-GLint g_bbox_max_uniform;
-
-// Número de texturas carregadas pela função LoadTextureImage()
-GLuint g_NumLoadedTextures = 0;
-
-//Variáveis que controlam o jogo no modo Multiplayer
-bool g_MultiplayerAtivo = false;
-bool g_JogadorAtual = false;
-        //false = jogador 1
-        // true = jogador 2
-bool g_BolaNoBuracoTwo = false;
-bool g_TerminouJogada = false;
-bool g_BolaEmFocoAtual = false; // false = câmera segue bola 1, true = câmera segue bola 2
-
-glm::vec3 g_PosBolaTwo = glm::vec3(1.0f, 0.025f, -3.0f); //posição atual da bola de golfe do SEGUNDO jogadors
-glm::vec3 g_PosTacoTwo = glm::vec3(1.0f, 0.0f, -1.0f); // direção apontada pelo taco do SEGUNDO jogador
-glm::vec3 g_VelocidadeBolaTwo = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::mat4 g_BolaRotationMatrixTwo = glm::mat4(1.0f); // Rotação acumulativa da bola
-
-// ========== SISTEMA DE MENU ==========
-enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING };
-GameState g_CurrentState = MENU_MAIN;
-float g_MenuCameraAngle = 0.0f;
-float g_MasterVolume = 0.8f;
-int g_TexturaPistaGrama = 0;  // 0=rocky, 1=brick, 2=solid green
-int g_TexturaPistaParede = 0; // 0=rocky, 1=brick, 2=solid gray
-int g_TexturaBola = 0;        // 0=white, 1=brick, 2=rocky
-int g_TexturaTaco = 0;        // 0=metal, 1=textured, 2=brick
-GLuint g_HudShaderProgram = 0;
-GLuint g_HudVAO = 0;
-GLuint g_HudVBO = 0;
-GLuint g_LogoTextureID = 0;
-int g_LogoWidth = 1, g_LogoHeight = 1;
-// Hover states para botões do menu
-bool g_HoverJogar = false, g_HoverMultiplayer = false;
-bool g_HoverConfig = false, g_HoverSair = false;
-bool g_HoverVoltar = false;
-bool g_HoverGramaL = false, g_HoverGramaR = false;
-bool g_HoverParedeL = false, g_HoverParedeR = false;
-bool g_HoverBolaL = false, g_HoverBolaR = false;
-bool g_HoverTacoL = false, g_HoverTacoR = false;
 // Extern para acessar o shader de texto (definido em textrendering.cpp)
 extern GLuint textprogram_id;
 
@@ -522,9 +317,9 @@ int main(int argc, char* argv[])
 
         // lógica de vitória e troca de níveis
         if(!g_MultiplayerAtivo){
-            if(g_BolaNoBuraco) ProxNivel();
-        } else if(g_BolaNoBuraco && g_BolaNoBuracoTwo) ProxNivel();
-        }
+            if(g_BolaNoBuraco) ProxNivel(window);
+        } else if(g_BolaNoBuraco && g_BolaNoBuracoTwo) ProxNivel(window);
+        
 
         // Aqui executamos as operações de renderização
         glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
@@ -570,6 +365,36 @@ int main(int argc, char* argv[])
         float nearplane = -0.1f;  // Posição do "near plane"
         float farplane  = -10.0f; // Posição do "far plane"
 
+                if (g_UsePerspectiveProjection)
+        {
+            // Projeção Perspectiva.
+            // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
+            
+            
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
+                field_of_view = field_of_view * 1.01f; //Taxa de zoom in
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && field_of_view > M_PI / 5.0f) { //Zoom out máximo (π/5 rad  = 36 graus)
+                field_of_view = field_of_view / 1.01f; //Taxa de zoom out
+            }
+
+            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
+
+        }
+        else
+        {
+            // Projeção Ortográfica.
+            // Para definição dos valores l, r, b, t ("left", "right", "bottom", "top"),
+            // PARA PROJEÇÃO ORTOGRÁFICA veja slides 219-224 do documento Aula_09_Projecoes.pdf.
+            // Para simular um "zoom" ortográfico, computamos o valor de "t"
+            // utilizando a variável g_CameraDistance.
+            float t = 1.5f*g_CameraDistance/2.5f;
+            float b = -t;
+            float r = t*g_ScreenRatio;
+            float l = -r;
+            projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
+        }
 
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
             field_of_view = field_of_view * 1.01f; //Taxa de zoom in
@@ -597,12 +422,12 @@ int main(int argc, char* argv[])
         #define BOLA   4
         #define BURACO 5
         #define TRAJETORIA 6
-
-
+        #define BANDEIRA 7
+        #define MASTRO 8
         #define HUD_BARRA 9
         #define GRAMA 10
         #define PISTALOOP 11
-        #define BANDEIRA 12
+
         #define PISTA_CHAO 13
         #define PISTA_PAREDE 14
         #define ARVORE_ALTA 15
@@ -753,42 +578,47 @@ int main(int argc, char* argv[])
 
         // Desenha a pista curva
         if(g_nivelAtual == 2){
-            model = Matrix_Translate(1.0f,1.0f,0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            model = Matrix_Translate(1.0f,1.0f,0.0f) * Matrix_Scale(1.0f, 0.0f, 1.0f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTACURVA);
-            DrawVirtualObject("Plane");
+            DrawVirtualObject("PistaCurva");
         }
 
         // Desenha a Pista em loop
         if(g_nivelAtual == 3){
-            model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 0.0f, 1.0f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTALOOP);
             DrawVirtualObject("loop");
         }
 
-        // Desenha a vegetação
-        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        /* Desenha a vegetação*/
+        model = Matrix_Translate(1.0f, 0.0f, 3.0f) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, ARVORE_ALTA);
-        DrawVirtualObject("Cube");
+        DrawVirtualObject("Arvore-ALta");
 
-        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        model = Matrix_Translate(1.5f, 0.0f, 0.5f) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, ARVORE_BAIXA);
-        DrawVirtualObject("Cube");
+        DrawVirtualObject("Arvore-Baixa");
 
-        model = Matrix_Translate(1.0f, 1.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        model = Matrix_Translate(2.0f, 0.0f, 0.0f) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, CACTUS);
-        DrawVirtualObject("Plane");
+        DrawVirtualObject("Cactus");
 
 
         // Desenha a Bandeira
-        model = Matrix_Translate(0.0f, 0.0f, 4.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        model = Matrix_Translate(0.3f, 0.0f, 4.0f) * Matrix_Scale(0.1f, 0.1f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, MASTRO);
+        DrawVirtualObject("Bandeira_Mastro"); 
+
+        model = Matrix_Translate(0.3f, 1.2f, 4.0f) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BANDEIRA);
-        DrawVirtualObject("Cylinder");
+        DrawVirtualObject("Blandeira"); 
 
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
@@ -1517,11 +1347,6 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height)
     g_ScreenRatio = (float)width / height;
 }
 
-// Variáveis globais que armazenam a última posição do cursor do mouse, para
-// que possamos calcular quanto que o mouse se movimentou entre dois instantes
-// de tempo. Utilizadas no callback CursorPosCallback() abaixo.
-double g_LastCursorPosX, g_LastCursorPosY;
-
 // Função callback chamada sempre que o usuário aperta algum dos botões do mouse
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -1738,6 +1563,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_TacoRotacao = 0.0f;
         g_TacoRotacaoVertical = 0.0f;
     }
+
+        // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
+    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+        g_UsePerspectiveProjection = true;
+    }
+
+    // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
+    if (key == GLFW_KEY_O && action == GLFW_PRESS) {
+        g_UsePerspectiveProjection = false;
+    }
+
 
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS) {
@@ -2515,11 +2351,7 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
     glUniform1i(g_object_id_uniform, BURACO);
     DrawVirtualObject("the_sphere");
-    // Mastro
-    model = Matrix_Translate(hp.x+0.2f, hp.y+0.5f, hp.z) * Matrix_Scale(0.015f, 0.5f, 0.015f);
-    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, MASTRO);
-    DrawVirtualObject("the_sphere");
+
     // Bandeira
     model = Matrix_Translate(hp.x+0.35f, hp.y+0.8f, hp.z) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.15f, 1.0f, 0.1f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -2599,7 +2431,7 @@ void ProxNivel(GLFWwindow* window) {
     }
 }
 
-void ApplyLoopCollision(glm::vec3& pos, glm::vec3& vel, float ball_radius)
+/*void ApplyLoopCollision(glm::vec3& pos, glm::vec3& vel, float ball_radius)
 {
     auto it = g_VirtualScene.find("loop");
     if (it == g_VirtualScene.end())
@@ -2618,7 +2450,7 @@ void ApplyLoopCollision(glm::vec3& pos, glm::vec3& vel, float ball_radius)
     if (pos.x > max_x) { pos.x = max_x; vel.x *= -0.8f; }
     if (pos.z < min_z) { pos.z = min_z; vel.z *= -0.8f; }
     if (pos.z > max_z) { pos.z = max_z; vel.z *= -0.8f; }
-}
+}*/
 
 void AtualizarFisicaBola(float delta_time) {
     glm::vec3 deslocamento = g_VelocidadeBola * delta_time;
@@ -2646,7 +2478,7 @@ void AtualizarFisicaBola(float delta_time) {
     float ball_radius = 0.025f;
 
     if (g_nivelAtual == 3) {
-        ApplyLoopCollision(g_PosBola, g_VelocidadeBola, ball_radius);
+        //ApplyLoopCollision(g_PosBola, g_VelocidadeBola, ball_radius);
     } else {
         if (g_PosBola.x > track_width - ball_radius) { g_PosBola.x = track_width - ball_radius; g_VelocidadeBola.x *= -0.8f; }
         if (g_PosBola.x < -(track_width - ball_radius)) { g_PosBola.x = -(track_width - ball_radius); g_VelocidadeBola.x *= -0.8f; }
@@ -2692,7 +2524,7 @@ void AtualizarFisicaBolaTwo(float delta_time){
     float ball_radius = 0.025f;
 
     if (g_nivelAtual == 3) {
-        ApplyLoopCollision(g_PosBolaTwo, g_VelocidadeBolaTwo, ball_radius);
+        //ApplyLoopCollision(g_PosBolaTwo, g_VelocidadeBolaTwo, ball_radius);
     } else {
         if (g_PosBolaTwo.x > track_width - ball_radius) { g_PosBolaTwo.x = track_width - ball_radius; g_VelocidadeBolaTwo.x *= -0.8f; }
         if (g_PosBolaTwo.x < -(track_width - ball_radius)) { g_PosBolaTwo.x = -(track_width - ball_radius); g_VelocidadeBolaTwo.x *= -0.8f; }

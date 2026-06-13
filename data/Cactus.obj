@@ -1,7 +1,7 @@
-# Blender 5.1.2
+# Blender 5.1.1
 # www.blender.org
 mtllib Cactus.mtl
-o Plane
+o Cactus
 v 0.120461 0.110756 0.120461
 v -0.120461 0.110756 0.120461
 v -0.120461 0.110756 -0.120461

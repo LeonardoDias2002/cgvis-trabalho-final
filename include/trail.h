@@ -11,14 +11,6 @@
 
 #include "globals.h"
 
-struct TrailSegment
-{
-    glm::vec3 posStart;   ///< Posição inicial do segmento
-    glm::vec3 posEnd;     ///< Posição final do segmento
-    float opacidade;        ///< Opacidade do segmento (desaparece gradualmente)
-    float tempoMax;         ///< Tempo máximo de vida do segmento
-    float tempoAtual;     ///< Tempo de vida atual do segmento
-};
 
 // =============================================
 // VARIÁVEIS GLOBAIS

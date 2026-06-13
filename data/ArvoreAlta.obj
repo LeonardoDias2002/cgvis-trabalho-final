@@ -1,7 +1,7 @@
-# Blender 5.1.2
+# Blender 5.1.1
 # www.blender.org
 mtllib ArvoreAlta.mtl
-o Cube
+o Arvore-ALta
 v -1.000000 18.317995 1.000000
 v -1.000000 18.317995 -1.000000
 v 1.000000 18.317995 -1.000000

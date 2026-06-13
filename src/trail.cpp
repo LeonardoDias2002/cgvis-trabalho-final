@@ -1,5 +1,6 @@
 //funções que criam uma trilha colorida que segue a bola
 #include "trail.h"
+#include "globals.h"
 #include "matrices.h"
 #include <glm/ext.hpp>
 
