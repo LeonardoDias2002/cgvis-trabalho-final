@@ -125,21 +125,24 @@ struct SceneObject
 // IMPORTANTE: Devem ser mantidas em sincronia com
 // shader_fragment.glsl.
 // =============================================
-#define SPHERE     0
-#define BUNNY      1
-#define PLANE      2
-#define TACO       3
-#define BOLA       4
-#define BURACO     5
-#define TRAJETORIA 6
-
-
-#define HUD_BARRA  9
-#define GRAMA      10
-#define PISTALOOP  11
-#define BANDEIRA  12
+#define SPHERE       0
+#define BUNNY        1
+#define PLANE        2
+#define TACO         3
+#define BOLA         4
+#define BURACO       5
+#define TRAJETORIA   6
+#define BANDEIRA     7
+#define MASTRO       8
+#define HUD_BARRA    9
+#define GRAMA        10
+#define PISTALOOP    11
 #define PISTA_CHAO   13
 #define PISTA_PAREDE 14
+#define ARVORE_ALTA  15
+#define ARVORE_BAIXA 16
+#define CACTUS       17
+#define PISTACURVA   18
 
 // =============================================
 // ENUM DE ESTADO DO JOGO
@@ -241,6 +244,28 @@ extern glm::vec3 g_PosBolaTwo;
 extern glm::vec3 g_PosTacoTwo;
 extern glm::vec3 g_VelocidadeBolaTwo;
 extern glm::mat4 g_BolaRotationMatrixTwo;
+
+// --- Loop Physics State Machine ---
+// Controla a física parametrizada do loop (PistaLoop)
+enum BallLoopState { BALL_ON_GROUND, BALL_ON_LOOP, BALL_FREE_FALL };
+extern BallLoopState g_EstadoBolaLoop;
+extern BallLoopState g_EstadoBolaLoopTwo;
+extern float g_LoopAngulo;              // Ângulo atual θ no círculo do loop (radianos)
+extern float g_LoopAnguloTwo;
+extern float g_LoopVelAngular;          // Velocidade angular ω = v/R
+extern float g_LoopVelAngularTwo;
+extern float g_BolaFreeFallVelY;        // Velocidade vertical durante queda livre
+extern float g_BolaFreeFallVelYTwo;
+
+// Posição do buraco depende do nível
+extern glm::vec3 g_HolePosition;
+
+// --- Heightmap: Triângulos da pista para raycasting ---
+struct TrackTriangle {
+    glm::vec3 v0, v1, v2;
+};
+extern std::vector<TrackTriangle> g_PistaCurvaTriangles;
+extern std::vector<TrackTriangle> g_PistaLoopTriangles;
 
 // --- Sistema de Menu ---
 extern GameState g_CurrentState;

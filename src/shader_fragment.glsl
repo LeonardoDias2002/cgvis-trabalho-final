@@ -242,6 +242,54 @@ void main()
         else
             Kd0 = vec3(0.5, 0.5, 0.5); // cinza solido
     }
+    else if ( object_id == PISTALOOP || object_id == PISTACURVA )
+    {
+        // Gerar UVs procedurais a partir da posição em world space
+        vec4 world_pos = model * position_model;
+        // Normal em world space para distinguir chão vs parede
+        vec4 world_normal = model * normal;
+        float up_dot = abs(normalize(world_normal).y);
+
+        if (up_dot > 0.5) {
+            // Chão (normal apontando pra cima): textura da grama/chão
+            U = world_pos.x * 2.0;
+            V = world_pos.z * 2.0;
+            if (u_TexturaGramaPista == 0)
+                Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+            else if (u_TexturaGramaPista == 1)
+                Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+            else
+                Kd0 = vec3(0.2, 0.7, 0.2);
+        } else {
+            // Parede (normal lateral): textura das paredes, independente
+            U = world_pos.y * 3.0 + world_pos.z * 3.0;
+            V = world_pos.x * 3.0;
+            if (u_TexturaParedesPista == 0)
+                Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+            else if (u_TexturaParedesPista == 1)
+                Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+            else
+                Kd0 = vec3(0.5, 0.5, 0.5);
+        }
+    }
+    else if ( object_id == MASTRO )
+    {
+        Kd0 = vec3(0.6, 0.6, 0.6); // mastro metálico
+        Ks = vec3(0.5, 0.5, 0.5);
+        q = 32.0;
+    }
+    else if ( object_id == ARVORE_ALTA || object_id == ARVORE_BAIXA )
+    {
+        Kd0 = vec3(0.15, 0.5, 0.12); // verde escuro de folhagem
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
+    else if ( object_id == CACTUS )
+    {
+        Kd0 = vec3(0.2, 0.55, 0.15); // verde cactus
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
 
     if ( object_id == HUD_BARRA ) 
     {
