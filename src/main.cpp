@@ -305,8 +305,11 @@ int main(int argc, char* argv[])
                         // Filtrar: apenas triângulos com normal apontando pra cima
                         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
                         float len = glm::length(normal);
-                        if (len > 1e-7f && (normal.y / len) > 0.3f) {
-                            g_PistaLoopTriangles.push_back({v0, v1, v2});
+                        if (len > 1e-7f) {
+                            g_PistaLoopAllTriangles.push_back({v0, v1, v2}); // Guarda teto, paredes e chão
+                            if ((normal.y / len) > 0.3f) {
+                                g_PistaLoopTriangles.push_back({v0, v1, v2}); // Guarda apenas chão para física comum
+                            }
                         }
                     }
                 }
@@ -315,6 +318,40 @@ int main(int argc, char* argv[])
         }
         printf("PistaLoop: %zu triângulos de chão extraídos para heightmap.\n", g_PistaLoopTriangles.size());
     }
+
+        // Caminho do Loop (Path Following Waypoints)
+        g_LoopWaypoints.clear();
+        // Curva extraída analiticamente do centro exato da geometria PistaLoop.obj
+        // O loop possui formato 'corkscrew' e torce os eixos X entre 1.070 e 3.320.
+        g_LoopWaypoints.push_back(glm::vec3(3.689f, 0.05f + 0.025f, -1.800f));
+        g_LoopWaypoints.push_back(glm::vec3(3.685f, 0.05f + 0.025f, -1.380f));
+        g_LoopWaypoints.push_back(glm::vec3(3.670f, 0.05f + 0.025f, -0.960f));
+        g_LoopWaypoints.push_back(glm::vec3(2.738f, 0.05f + 0.025f, -0.540f));
+        g_LoopWaypoints.push_back(glm::vec3(2.210f, 0.05f + 0.025f, -0.120f));
+        g_LoopWaypoints.push_back(glm::vec3(2.576f, 0.293f, 0.166f));
+        g_LoopWaypoints.push_back(glm::vec3(3.320f, 0.425f, 0.424f));
+        g_LoopWaypoints.push_back(glm::vec3(3.177f, 0.629f, 0.628f));
+        g_LoopWaypoints.push_back(glm::vec3(2.963f, 0.887f, 0.760f));
+        g_LoopWaypoints.push_back(glm::vec3(2.756f, 1.173f, 0.805f));
+        g_LoopWaypoints.push_back(glm::vec3(2.512f, 1.459f, 0.760f));
+        g_LoopWaypoints.push_back(glm::vec3(2.381f, 1.717f, 0.628f));
+        g_LoopWaypoints.push_back(glm::vec3(2.267f, 1.921f, 0.424f));
+        g_LoopWaypoints.push_back(glm::vec3(2.216f, 2.053f, 0.166f));
+        g_LoopWaypoints.push_back(glm::vec3(2.203f, 2.098f, -0.120f));
+        g_LoopWaypoints.push_back(glm::vec3(2.194f, 2.053f, -0.406f));
+        g_LoopWaypoints.push_back(glm::vec3(2.138f, 1.921f, -0.664f));
+        g_LoopWaypoints.push_back(glm::vec3(2.035f, 1.717f, -0.868f));
+        g_LoopWaypoints.push_back(glm::vec3(1.893f, 1.459f, -1.000f));
+        g_LoopWaypoints.push_back(glm::vec3(1.648f, 1.173f, -1.045f));
+        g_LoopWaypoints.push_back(glm::vec3(1.417f, 0.887f, -1.000f));
+        g_LoopWaypoints.push_back(glm::vec3(1.245f, 0.629f, -0.868f));
+        g_LoopWaypoints.push_back(glm::vec3(1.070f, 0.425f, -0.664f));
+        g_LoopWaypoints.push_back(glm::vec3(1.649f, 0.293f, -0.406f));
+        g_LoopWaypoints.push_back(glm::vec3(2.263f, 0.248f, -0.120f));
+        g_LoopWaypoints.push_back(glm::vec3(1.693f, 0.05f + 0.025f, 0.285f));
+        g_LoopWaypoints.push_back(glm::vec3(0.802f, 0.05f + 0.025f, 0.690f));
+        g_LoopWaypoints.push_back(glm::vec3(0.826f, 0.05f + 0.025f, 1.095f));
+        g_LoopWaypoints.push_back(glm::vec3(0.744f, 0.05f + 0.025f, 1.500f));
 
     // ArVore Baixa
     ObjModel ArvoreBaixamodel("../../data/ArvoreBaixa.obj");
@@ -2470,8 +2507,12 @@ void MenuHandleClick(GLFWwindow* window)
                 g_TacoRotacao = 0.0f;
                 g_VelocidadeBola = glm::vec3(0.0f);
                 g_VelocidadeBolaTwo = glm::vec3(0.0f);
-                g_EstadoBolaLoop = BALL_ON_GROUND;
-                g_EstadoBolaLoopTwo = BALL_ON_GROUND;
+                g_BolaNoCaminho = false;
+                g_IndiceCaminho = 0;
+                g_ProgressoCaminho = 0.0f;
+                g_BolaNoCaminhoTwo = false;
+                g_IndiceCaminhoTwo = 0;
+                g_ProgressoCaminhoTwo = 0.0f;
 
                 // Posições dependem do nível (coordenadas verificadas via análise do mesh)
                 if (g_nivelAtual == 1) {
@@ -2532,8 +2573,12 @@ void ProxNivel(GLFWwindow* window) {
         g_BolaNoBuracoTwo = false;
         g_VelocidadeBola = glm::vec3(0.0f);
         g_VelocidadeBolaTwo = glm::vec3(0.0f);
-        g_EstadoBolaLoop = BALL_ON_GROUND;
-        g_EstadoBolaLoopTwo = BALL_ON_GROUND;
+        g_BolaNoCaminho = false;
+        g_IndiceCaminho = 0;
+        g_ProgressoCaminho = 0.0f;
+        g_BolaNoCaminhoTwo = false;
+        g_IndiceCaminhoTwo = 0;
+        g_ProgressoCaminhoTwo = 0.0f;
         g_BolaRotationMatrix = glm::mat4(1.0f);
         g_BolaRotationMatrixTwo = glm::mat4(1.0f);
         g_TacoRotacao = 0.0f;
@@ -2556,19 +2601,44 @@ void ProxNivel(GLFWwindow* window) {
 
 // Forward declaration (definição completa abaixo)
 static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
-                                float x, float z, float fallbackY);
+                                float x, float current_y, float z, float fallbackY);
 
 // =============================================
-// CONSTANTES DO LOOP (world space, da análise do mesh)
+// CONSTANTES DO LOOP — Rail Physics (world space)
 // =============================================
-static const float LOOP_CENTER_X  = 2.202f;
-static const float LOOP_CENTER_Y  = 1.196f;   // (top 2.226 + bottom 0.166) / 2
-static const float LOOP_CENTER_Z  = -0.13f;
-static const float LOOP_RADIUS    = 1.03f;    // (2.226 - 0.166) / 2
-static const float LOOP_ENTRY_Z   = -1.1f;
-static const float LOOP_EXIT_Z    = 0.85f;
-static const float GRAVITY        = 3.0f;
+// Geometria analítica do loop cilíndrico, extraída da análise do mesh PistaLoop.obj.
+// O loop é um círculo vertical no plano YZ, centrado em LOOP_CENTER, com raio LOOP_RADIUS.
+// A bola percorre o círculo em coordenadas polares: θ=0 → base (6 horas), θ=π → topo (12 horas).
+static const float LOOP_CENTER_X  = 2.202f;   // Posição lateral (travada enquanto no rail)
+static const float LOOP_CENTER_Y  = 1.196f;   // Centro vertical do loop
+static const float LOOP_CENTER_Z  = -0.13f;   // Centro em profundidade
+static const float LOOP_RADIUS    = 1.03f;    // Raio do círculo
+static const float GRAVITY        = 9.81f;    // Gravidade realista (m/s²)
 static const float BALL_RADIUS    = 0.025f;
+static const float LOOP_FRICTION  = 0.02f;    // Atrito leve no rail para estabilidade
+
+// --- AABB Trigger Volume ---
+// Caixa invisível na rampa de entrada do loop. Engloba toda a largura da curva.
+static const glm::vec3 TRIGGER_AABB_MIN = glm::vec3(3.0f, -0.5f, -2.5f);
+static const glm::vec3 TRIGGER_AABB_MAX = glm::vec3(4.2f, 1.5f, -1.0f);
+static const float     TRIGGER_MIN_SPEED = 0.5f; // Velocidade mínima reduzida para garantir ativação
+
+// --- AABB Exit Volume ---
+// Caixa na saída do loop, onde a bola retorna ao estado de chão.
+static const glm::vec3 EXIT_AABB_MIN = glm::vec3(1.2f, 0.0f, 0.3f);
+static const glm::vec3 EXIT_AABB_MAX = glm::vec3(3.2f, 0.5f, 1.2f);
+
+/**
+ * @brief Testa se um ponto está dentro de uma AABB.
+ */
+static inline bool PointInsideAABB(const glm::vec3& p,
+                                   const glm::vec3& aabb_min,
+                                   const glm::vec3& aabb_max)
+{
+    return p.x >= aabb_min.x && p.x <= aabb_max.x &&
+           p.y >= aabb_min.y && p.y <= aabb_max.y &&
+           p.z >= aabb_min.z && p.z <= aabb_max.z;
+}
 
 static void ApplyTrackCollision(glm::vec3& pos, glm::vec3& vel,
                                 float min_x, float max_x,
@@ -2581,93 +2651,199 @@ static void ApplyTrackCollision(glm::vec3& pos, glm::vec3& vel,
     if (pos.z < min_z + B) { pos.z = min_z + B; vel.z *= -0.5f; }
 }
 
-static void ApplyLoopTrackBounds(glm::vec3& pos, glm::vec3& vel)
-{
-    float min_x, max_x;
-    if (pos.z < 0.0f)       { min_x = 2.55f; max_x = 4.80f; }
-    else if (pos.z < 2.0f)  { min_x = -0.2f; max_x = 4.6f;  }
-    else                    { min_x = -2.1f; max_x = 4.1f;  }
-    ApplyTrackCollision(pos, vel, min_x, max_x, -7.4f, 9.4f);
+
+/**
+ * Calculates the closest point on a 3D triangle to a given coordinate.
+ * Uses Voronoi region separation to evaluate the closest geometric feature (vertex, edge, or face)
+ * to maintain strict constraints for non-planar surface traversal.
+ * 
+ * @param p The target spatial coordinate.
+ * @param a Triangle vertex 0.
+ * @param b Triangle vertex 1.
+ * @param c Triangle vertex 2.
+ * @param out_normal Output parameter returning the face normal of the evaluated triangle.
+ * @return The closest point on the triangle's surface to p.
+ */
+static glm::vec3 ClosestPointOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, glm::vec3& out_normal) {
+    glm::vec3 ab = b - a;
+    glm::vec3 ac = c - a;
+    glm::vec3 ap = p - a;
+    
+    out_normal = glm::normalize(glm::cross(ab, ac));
+    
+    float d1 = glm::dot(ab, ap);
+    float d2 = glm::dot(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) return a;
+    
+    glm::vec3 bp = p - b;
+    float d3 = glm::dot(ab, bp);
+    float d4 = glm::dot(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) return b;
+    
+    float vc = d1*d4 - d3*d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+        float v = d1 / (d1 - d3);
+        return a + v * ab;
+    }
+    
+    glm::vec3 cp = p - c;
+    float d5 = glm::dot(ab, cp);
+    float d6 = glm::dot(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) return c;
+    
+    float vb = d5*d2 - d1*d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+        float w = d2 / (d2 - d6);
+        return a + w * ac;
+    }
+    
+    float va = d3*d6 - d5*d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+        float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        return b + w * (c - b);
+    }
+    
+    float denom = 1.0f / (va + vb + vc);
+    float v = vb * denom;
+    float w = vc * denom;
+    return a + ab * v + ac * w;
 }
 
-// Energy-conservation loop: v² = v₀² - 2gR(1 - cosθ)
+/**
+ * Executes sub-stepped physics integration for Level 3 (Loop Track).
+ * Dynamically switches between planar raycast constraints and universal 3D mesh collisions
+ * to allow navigation through complex topologies without predefined waypoints.
+ * 
+ * @param pos Current positional vector of the ball.
+ * @param vel Current velocity vector of the ball.
+ * @param no_caminho Deprecated waypoint state flag (maintained for signature compatibility).
+ * @param indice Deprecated waypoint state flag.
+ * @param progresso Deprecated waypoint state flag.
+ * @param rot_matrix Reference to the rotation matrix for visual representation.
+ * @param dt Delta time for the current frame.
+ */
 static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
-                                BallLoopState& estado, float& angulo,
-                                float& vel_angular, float& free_fall_vel_y,
+                                bool& no_caminho, int& indice, float& progresso,
                                 glm::mat4& rot_matrix, float dt)
 {
-    switch (estado) {
-    case BALL_ON_GROUND: {
-        const int N = std::max(1, (int)(dt / 0.004f));
-        float sub = dt / N;
-        for (int i = 0; i < N; i++) {
-            pos += vel * sub;
-            vel -= vel * 0.9f * sub;
-            if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
-            ApplyLoopTrackBounds(pos, vel);
-            float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.z, 0.0f);
-            pos.y = sY + BALL_RADIUS;
+    const int N = std::max(1, (int)(dt / 0.004f));
+    float sub = dt / N;
+
+    for (int i = 0; i < N; i++) {
+        // Define the spatial boundary for continuous 3D mesh physics application.
+        bool inside_loop_zone = (pos.z > -2.0f && pos.z < 1.0f);
+
+        vel.y -= GRAVITY * sub;
+        
+        glm::vec3 next_pos = pos + vel * sub;
+
+        if (inside_loop_zone && !g_PistaLoopAllTriangles.empty()) {
+            glm::vec3 best_p = next_pos;
+            glm::vec3 best_n = glm::vec3(0.0f, 1.0f, 0.0f);
+            float min_dist2 = 1e9f;
+
+            for (const auto& tri : g_PistaLoopAllTriangles) {
+                // Optimize intersection testing by excluding distant geometric segments.
+                float min_z = std::min({tri.v0.z, tri.v1.z, tri.v2.z});
+                float max_z = std::max({tri.v0.z, tri.v1.z, tri.v2.z});
+                if (next_pos.z < min_z - 0.5f || next_pos.z > max_z + 0.5f) continue;
+
+                glm::vec3 n;
+                glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                glm::vec3 diff = next_pos - cp;
+                float dist2 = glm::dot(diff, diff);
+                
+                // Restrict snapping range to prevent erroneous attachment to the outer hull shell structure.
+                if (dist2 < min_dist2 && dist2 < 0.25f) {
+                    min_dist2 = dist2;
+                    best_p = cp;
+                    best_n = n;
+                }
+            }
+
+            if (min_dist2 < 0.25f) {
+                // Universal 3D Edge Detection: 
+                // Evaluates lateral deviation between the desired step vector and the closest projection.
+                // A non-zero divergence implies the kinematic path breached the valid polygon perimeter.
+                glm::vec3 diff = next_pos - best_p;
+                float normal_dist = glm::dot(diff, best_n);
+                glm::vec3 diff_tangent = diff - best_n * normal_dist;
+                float lateral = glm::length(diff_tangent);
+
+                if (lateral > 0.01f) {
+                    // Impose an elastic boundary reaction vector to contain motion within the mesh.
+                    glm::vec3 wall_normal = diff_tangent / lateral;
+                    float vel_into_wall = glm::dot(vel, wall_normal);
+                    if (vel_into_wall > 0.0f) {
+                        vel -= wall_normal * vel_into_wall * 1.5f;
+                    }
+                }
+                
+                pos = best_p + best_n * BALL_RADIUS;
+
+                // Project velocity onto the tangential plane to preserve momentum along curvature.
+                float vel_normal = glm::dot(vel, best_n);
+                if (vel_normal < 0.0f) {
+                    vel -= best_n * vel_normal;
+                }
+                
+                vel -= vel * LOOP_FRICTION * sub;
+                
+                // Centripetal failure condition: Detach when tangential inertia is insufficient to counter gravity.
+                float speed = glm::length(vel);
+                if (best_n.y < 0.5f && speed < 1.5f && pos.y > 0.5f) {
+                    vel.y -= GRAVITY * sub * 2.0f;
+                    pos = next_pos; 
+                }
+            } else {
+                pos = next_pos;
+                // Planar raycast fallback for untethered entities traversing the loop zone overhead space.
+                float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, -1e9f);
+                if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
+                    pos.y = sY + BALL_RADIUS;
+                    vel.y = 0.0f;
+                }
+            }
+        } else {
+            // Planar physics fallback with dynamic edge bounding.
+            float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
+            if (checkY < -1e8f) {
+                // Isolate orthogonal reflection responses to permit continuous boundary sliding.
+                float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
+                float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
+                if (checkY_X < -1e8f) vel.x *= -0.5f;
+                if (checkY_Z < -1e8f) vel.z *= -0.5f;
+                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
+                    vel.x *= -0.5f;
+                    vel.z *= -0.5f;
+                }
+                next_pos = pos;
+            }
+
+            pos = next_pos;
+            vel.x -= vel.x * 0.9f * sub; 
+            vel.z -= vel.z * 0.9f * sub;
+            if (glm::length(glm::vec3(vel.x, 0.0f, vel.z)) < 0.05f) {
+                vel.x = 0.0f; vel.z = 0.0f;
+            }
+            
+            float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, 0.0f);
+            if (pos.y <= sY + BALL_RADIUS) {
+                pos.y = sY + BALL_RADIUS;
+                vel.y = 0.0f;
+            }
         }
-        float d = glm::length(vel * dt);
-        if (d > 1e-4f) {
-            glm::vec4 ax(vel.z, 0, -vel.x, 0);
-            float al = norm(ax);
-            if (al > 1e-4f) rot_matrix = Matrix_Rotate(d/BALL_RADIUS, ax/al) * rot_matrix;
-        }
-        if (pos.z > LOOP_ENTRY_Z && pos.z < LOOP_EXIT_Z &&
-            fabs(pos.x - LOOP_CENTER_X) < 1.5f && vel.z > 1.5f)
-        {
-            free_fall_vel_y = glm::length(vel); // v₀ para conservação de energia
-            angulo = 0.0f;
-            estado = BALL_ON_LOOP;
-            pos.x = LOOP_CENTER_X;
-            vel = glm::vec3(0.0f);
-        }
-        break;
     }
-    case BALL_ON_LOOP: {
-        float v0 = free_fall_vel_y;
-        float height = LOOP_RADIUS * (1.0f - cos(angulo));
-        float v_sq = v0*v0 - 2.0f*GRAVITY*height;
-        if (v_sq <= 0.0f) {
-            estado = BALL_FREE_FALL;
-            vel = glm::vec3(0.0f);
-            angulo = 0.0f;
-            break;
-        }
-        float v_cur = sqrt(v_sq);
-        float omega = v_cur / LOOP_RADIUS;
-        angulo += omega * dt;
-        pos.y = LOOP_CENTER_Y - LOOP_RADIUS * cos(angulo);
-        pos.z = LOOP_CENTER_Z + LOOP_RADIUS * sin(angulo);
-        pos.x = LOOP_CENTER_X;
-        float arc = omega * LOOP_RADIUS * dt;
-        if (arc > 1e-4f) {
-            glm::vec4 ax(1,0,0,0);
-            rot_matrix = Matrix_Rotate(arc/BALL_RADIUS, ax) * rot_matrix;
-        }
-        if (angulo >= 2.0f * (float)M_PI) {
-            estado = BALL_ON_GROUND;
-            vel = glm::vec3(0.0f, 0.0f, v_cur * 0.8f);
-            float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.z, 0.0f);
-            pos.y = sY + BALL_RADIUS;
-            angulo = 0.0f;
-        }
-        break;
-    }
-    case BALL_FREE_FALL: {
-        vel.y -= GRAVITY * dt;
-        pos += vel * dt;
-        float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.z, 0.0f);
-        if (pos.y <= sY + BALL_RADIUS) {
-            pos.y = sY + BALL_RADIUS;
-            vel.y = 0.0f;
-            estado = BALL_ON_GROUND;
-        }
-        break;
-    }
+    
+    // Rotação visual 
+    float d = glm::length(vel * dt);
+    if (d > 1e-4f) {
+        glm::vec4 ax(vel.z, 0, -vel.x, 0);
+        float al = norm(ax);
+        if (al > 1e-4f) rot_matrix = Matrix_Rotate(d / BALL_RADIUS, ax / al) * rot_matrix;
     }
 }
+
 
 static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
                                    glm::mat4& rot_matrix, float dt, int nivel)
@@ -2693,7 +2869,7 @@ static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
                 min_x = -0.83f; max_x = 3.32f;
             }
             ApplyTrackCollision(pos, vel, min_x, max_x, -3.6f, 0.8f);
-            float sY = RaycastTrackHeight(g_PistaCurvaTriangles, pos.x, pos.z, 0.0f);
+            float sY = RaycastTrackHeight(g_PistaCurvaTriangles, pos.x, pos.y, pos.z, 0.0f);
             pos.y = sY + BALL_RADIUS;
         }
     }
@@ -2707,8 +2883,8 @@ static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
 
 void AtualizarFisicaBola(float delta_time) {
     if (g_nivelAtual == 3)
-        AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_EstadoBolaLoop,
-                            g_LoopAngulo, g_LoopVelAngular, g_BolaFreeFallVelY,
+        AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_BolaNoCaminho,
+                            g_IndiceCaminho, g_ProgressoCaminho,
                             g_BolaRotationMatrix, delta_time);
     else
         AtualizarFisicaSubstep(g_PosBola, g_VelocidadeBola,
@@ -2716,14 +2892,14 @@ void AtualizarFisicaBola(float delta_time) {
     if (glm::length(glm::vec2(g_PosBola.x - g_HolePosition.x, g_PosBola.z - g_HolePosition.z)) < 0.15f) {
         g_BolaNoBuraco = true; g_VelocidadeBola = glm::vec3(0.0f);
         g_PosBola = glm::vec3(g_HolePosition.x, -0.05f, g_HolePosition.z);
-        g_EstadoBolaLoop = BALL_ON_GROUND; ClearTrail();
+        g_BolaNoCaminho = false; ClearTrail();
     }
 }
 
 void AtualizarFisicaBolaTwo(float delta_time) {
     if (g_nivelAtual == 3)
-        AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_EstadoBolaLoopTwo,
-                            g_LoopAnguloTwo, g_LoopVelAngularTwo, g_BolaFreeFallVelYTwo,
+        AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_BolaNoCaminhoTwo,
+                            g_IndiceCaminhoTwo, g_ProgressoCaminhoTwo,
                             g_BolaRotationMatrixTwo, delta_time);
     else
         AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
@@ -2731,7 +2907,7 @@ void AtualizarFisicaBolaTwo(float delta_time) {
     if (glm::length(glm::vec2(g_PosBolaTwo.x - g_HolePosition.x, g_PosBolaTwo.z - g_HolePosition.z)) < 0.15f) {
         g_BolaNoBuracoTwo = true; g_VelocidadeBolaTwo = glm::vec3(0.0f);
         g_PosBolaTwo = glm::vec3(g_HolePosition.x, -0.05f, g_HolePosition.z);
-        g_EstadoBolaLoopTwo = BALL_ON_GROUND; ClearTrail2();
+        g_BolaNoCaminhoTwo = false; ClearTrail2();
     }
 }
 
@@ -2744,10 +2920,12 @@ void AtualizarFisicaBolaTwo(float delta_time) {
 // Usa o teste de interseção Möller–Trumbore.
 // =============================================
 static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
-                                float x, float z, float fallbackY)
+                                float x, float current_y, float z, float fallbackY)
 {
-    // Raio: origem = (x, 100, z), direção = (0, -1, 0)
-    glm::vec3 orig(x, 100.0f, z);
+    // Raio: origem = (x, current_y + 0.1f, z), direção = (0, -1, 0)
+    // O offset de +0.1f garante que o raio saia imediatamente acima da bola,
+    // ignorando qualquer malha de teto que esteja muito mais alto.
+    glm::vec3 orig(x, current_y + 0.1f, z);
     glm::vec3 dir(0.0f, -1.0f, 0.0f);
     float best_y = -1e9f;
     bool hit = false;

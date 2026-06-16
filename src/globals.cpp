@@ -123,21 +123,23 @@ glm::vec3 g_VelocidadeBolaTwo = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::mat4 g_BolaRotationMatrixTwo = glm::mat4(1.0f); // Rotação acumulativa da bola
 
 // ========== LOOP PHYSICS ==========
-BallLoopState g_EstadoBolaLoop = BALL_ON_GROUND;
-BallLoopState g_EstadoBolaLoopTwo = BALL_ON_GROUND;
-float g_LoopAngulo = 0.0f;
-float g_LoopAnguloTwo = 0.0f;
-float g_LoopVelAngular = 0.0f;
-float g_LoopVelAngularTwo = 0.0f;
-float g_BolaFreeFallVelY = 0.0f;
-float g_BolaFreeFallVelYTwo = 0.0f;
+bool g_BolaNoCaminho = false;
+int g_IndiceCaminho = 0;
+float g_ProgressoCaminho = 0.0f;
+
+bool g_BolaNoCaminhoTwo = false;
+int g_IndiceCaminhoTwo = 0;
+float g_ProgressoCaminhoTwo = 0.0f;
+
+std::vector<glm::vec3> g_LoopWaypoints;
 
 // Posição do buraco (atualizada por nível)
 glm::vec3 g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
 
-// Triângulos da pista para raycasting de heightmap
+// Triângulos da pista para raycasting// --- Heightmap ---
 std::vector<TrackTriangle> g_PistaCurvaTriangles;
 std::vector<TrackTriangle> g_PistaLoopTriangles;
+std::vector<TrackTriangle> g_PistaLoopAllTriangles;
 
 // ========== SISTEMA DE MENU ==========
 GameState g_CurrentState = MENU_MAIN;

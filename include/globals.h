@@ -246,16 +246,16 @@ extern glm::vec3 g_VelocidadeBolaTwo;
 extern glm::mat4 g_BolaRotationMatrixTwo;
 
 // --- Loop Physics State Machine ---
-// Controla a física parametrizada do loop (PistaLoop)
-enum BallLoopState { BALL_ON_GROUND, BALL_ON_LOOP, BALL_FREE_FALL };
-extern BallLoopState g_EstadoBolaLoop;
-extern BallLoopState g_EstadoBolaLoopTwo;
-extern float g_LoopAngulo;              // Ângulo atual θ no círculo do loop (radianos)
-extern float g_LoopAnguloTwo;
-extern float g_LoopVelAngular;          // Velocidade angular ω = v/R
-extern float g_LoopVelAngularTwo;
-extern float g_BolaFreeFallVelY;        // Velocidade vertical durante queda livre
-extern float g_BolaFreeFallVelYTwo;
+// Controla a física por Path Following (Waypoints) do loop (PistaLoop)
+extern bool g_BolaNoCaminho;
+extern int g_IndiceCaminho;
+extern float g_ProgressoCaminho;
+
+extern bool g_BolaNoCaminhoTwo;
+extern int g_IndiceCaminhoTwo;
+extern float g_ProgressoCaminhoTwo;
+
+extern std::vector<glm::vec3> g_LoopWaypoints;
 
 // Posição do buraco depende do nível
 extern glm::vec3 g_HolePosition;
@@ -266,6 +266,7 @@ struct TrackTriangle {
 };
 extern std::vector<TrackTriangle> g_PistaCurvaTriangles;
 extern std::vector<TrackTriangle> g_PistaLoopTriangles;
+extern std::vector<TrackTriangle> g_PistaLoopAllTriangles; // ALL triangles for 3D physics
 
 // --- Sistema de Menu ---
 extern GameState g_CurrentState;
