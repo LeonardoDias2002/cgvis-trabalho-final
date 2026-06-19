@@ -138,6 +138,7 @@ glm::vec3 g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
 
 // Triângulos da pista para raycasting// --- Heightmap ---
 std::vector<TrackTriangle> g_PistaCurvaTriangles;
+std::vector<TrackTriangle> g_PistaCurvaAllTriangles;
 std::vector<TrackTriangle> g_PistaLoopTriangles;
 std::vector<TrackTriangle> g_PistaLoopAllTriangles;
 
@@ -163,6 +164,7 @@ bool g_HoverGramaL = false, g_HoverGramaR = false;
 bool g_HoverParedeL = false, g_HoverParedeR = false;
 bool g_HoverBolaL = false, g_HoverBolaR = false;
 bool g_HoverTacoL = false, g_HoverTacoR = false;
+bool g_HoverProxPista = false, g_HoverMenuCompleto = false;
 
 // Posição do cursor 
 double g_LastCursorPosX, g_LastCursorPosY;

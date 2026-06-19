@@ -63,6 +63,7 @@ GLuint LoadShader_Fragment(const char* filename); // Carrega um fragment shader
 void LoadShader(const char* filename, GLuint shader_id); // Função utilizada pelas duas acima
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
+float RaycastTrackHeight(float x, float z, float fallbackY);
 void RotacionarTaco(GLFWwindow* window); // atualiza a animação do taco
 
 // Funções do sistema de menu
@@ -123,6 +124,8 @@ void AtualizarCamera();
 
 // Extern para acessar o shader de texto (definido em textrendering.cpp)
 extern GLuint textprogram_id;
+
+static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris, float x, float current_y, float z, float fallbackY);
 
 int main(int argc, char* argv[])
 {
@@ -264,6 +267,8 @@ int main(int argc, char* argv[])
                             attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+0]*scale,
                             attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+1]*scale + y_off,
                             attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+2]*scale);
+                        // Guardar todos os triângulos para física 3D
+                        g_PistaCurvaAllTriangles.push_back({v0, v1, v2});
                         // Filtrar: apenas triângulos com normal apontando pra cima
                         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
                         float len = glm::length(normal);
@@ -390,7 +395,7 @@ int main(int argc, char* argv[])
         previous_time = current_time;
 
         // ===== MENU MODE: renderiza menu e pula gameplay =====
-        if (g_CurrentState != PLAYING) {
+        if (g_CurrentState != PLAYING && g_CurrentState != MENU_LEVEL_COMPLETE) {
             glClearColor(0.05f, 0.08f, 0.12f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             MenuUpdate(window, delta_time);
@@ -429,10 +434,17 @@ int main(int argc, char* argv[])
         UpdateTrailSegments(delta_time);
 
         // lógica de vitória e troca de níveis
-        if(!g_MultiplayerAtivo){
-            if(g_BolaNoBuraco) ProxNivel(window);
-        } else if(g_BolaNoBuraco && g_BolaNoBuracoTwo) ProxNivel(window);
-        
+        if (g_CurrentState == PLAYING) {
+            bool won = false;
+            if (!g_MultiplayerAtivo) {
+                if (g_BolaNoBuraco) won = true;
+            } else if (g_BolaNoBuraco && g_BolaNoBuracoTwo) {
+                won = true;
+            }
+            if (won) {
+                g_CurrentState = MENU_LEVEL_COMPLETE;
+            }
+        }
 
         // Aqui executamos as operações de renderização
         glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
@@ -578,60 +590,63 @@ int main(int argc, char* argv[])
 
         // Trajetória da bola (renderizada apenas se estiver parada)
         if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && !g_JogadorAtual) {
-            
-            
+            glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_TrailColor"), 1.0f, 1.0f, 1.0f);
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
-            // Direção do arremesso: oposta ao taco
             glm::vec3 dir_arremesso = glm::vec3(-cosseno, 0.0f, -seno);
             
-            // Desenha um "tapete/raio" no chão correspondente à força carregada
-            float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f; // Força mínima ao mirar
-            float comp_trajetoria = forca_base * 0.2f; // escala da linha
-            
-            // O plano no the_plane tem tamanho 2x2. Uma escala Z de comp_trajetoria/2.0 faz o comprimento total = comp_trajetoria
-            float half_length = comp_trajetoria / 2.0f;
-            glm::vec3 centro_raio = g_PosBola + dir_arremesso * half_length;
+            float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f;
+            int num_dots = (int)(forca_base * 4.0f);
+            float step = 0.1f;
             
             glUniform1i(g_object_id_uniform, TRAJETORIA);
-            // Rotaciona para apontar na direção do arremesso:
-            // arctan2(-x, -z) para rotacionar ao redor do Y
-            float angulo_raio = atan2(-dir_arremesso.x, -dir_arremesso.z);
-            model = Matrix_Translate(centro_raio.x, g_PosBola.y + 0.005f, centro_raio.z) * Matrix_Rotate_Y(angulo_raio) * Matrix_Scale(0.02f, 1.0f, half_length);
-            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-            DrawVirtualObject("the_plane");
+            for (int i = 1; i <= num_dots; i++) {
+                glm::vec3 pos_dot = g_PosBola + dir_arremesso * (i * step);
+                
+                float ray_y = g_PosBola.y;
+                if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
+                else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
+                
+                model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
+                glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+                DrawVirtualObject("the_sphere");
+            }
 
         } else if (glm::length(g_VelocidadeBolaTwo) < 0.1f && !g_BolaNoBuraco && g_JogadorAtual) {
-
+            glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_TrailColor"), 1.0f, 1.0f, 1.0f);
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
-            // Direção do arremesso: oposta ao taco
             glm::vec3 dir_arremesso = glm::vec3(-cosseno, 0.0f, -seno);
             
-            // Desenha um "tapete/raio" no chão correspondente à força carregada
-            float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f; // Força mínima ao mirar
-            float comp_trajetoria = forca_base * 0.2f; // escala da linha
-            
-            // O plano no the_plane tem tamanho 2x2. Uma escala Z de comp_trajetoria/2.0 faz o comprimento total = comp_trajetoria
-            float half_length = comp_trajetoria / 2.0f;
-            glm::vec3 centro_raio = g_PosBolaTwo + dir_arremesso * half_length;
+            float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f;
+            int num_dots = (int)(forca_base * 4.0f);
+            float step = 0.1f;
             
             glUniform1i(g_object_id_uniform, TRAJETORIA);
-            // Rotaciona para apontar na direção do arremesso:
-            // arctan2(-x, -z) para rotacionar ao redor do Y
-            float angulo_raio = atan2(-dir_arremesso.x, -dir_arremesso.z);
-            model = Matrix_Translate(centro_raio.x, g_PosBolaTwo.y + 0.005f, centro_raio.z) * Matrix_Rotate_Y(angulo_raio) * Matrix_Scale(0.02f, 1.0f, half_length);
-            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-            DrawVirtualObject("the_plane");
-
+            for (int i = 1; i <= num_dots; i++) {
+                glm::vec3 pos_dot = g_PosBolaTwo + dir_arremesso * (i * step);
+                
+                float ray_y = g_PosBolaTwo.y;
+                if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
+                else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
+                
+                model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
+                glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+                DrawVirtualObject("the_sphere");
+            }
         }
         
 
-        // Buraco (posição depende do nível)
-        model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z) * Matrix_Scale(0.12f, 0.001f, 0.12f);
+        // Passa a posição do buraco para o shader para descartar os fragmentos da pista e criar o buraco físico
+        glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), g_HolePosition.x, g_HolePosition.y, g_HolePosition.z);
+
+        // Buraco (Copo de esfera invertida)
+        glDisable(GL_CULL_FACE); // Permitir ver a parte de dentro da esfera
+        model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z) * Matrix_Scale(0.12f, 0.12f, 0.12f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BURACO);
         DrawVirtualObject("the_sphere");
+        glEnable(GL_CULL_FACE); // Reativar o culling
 
         // Renderiza a trilha da bola
         glUseProgram(g_GpuProgramID);
@@ -751,6 +766,11 @@ int main(int argc, char* argv[])
         // Imprimimos na tela informação sobre o número de quadros renderizados
         // por segundo (frames per second).
         TextRendering_ShowFramesPerSecond(window);
+
+        // Se o nível foi concluído, renderizar a UI do menu de fase por cima de tudo
+        if (g_CurrentState == MENU_LEVEL_COMPLETE) {
+            MenuRenderOverlay(window);
+        }
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -1579,6 +1599,10 @@ void Correcao_KeyCallback(int key, int action, int mod);
 // tecla do teclado. Veja http://www.glfw.org/docs/latest/input_guide.html#input_key
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
+    if (g_CurrentState == MENU_MAIN || g_CurrentState == MENU_LEVELS || g_CurrentState == MENU_SETTINGS || g_CurrentState == MENU_LEVEL_COMPLETE) {
+        MenuRenderOverlay(window);
+        return;
+    }
     // =======================
     // Não modifique esta chamada! Ela é utilizada para correção automatizada dos
     // laboratórios. Deve ser sempre o primeiro comando desta função KeyCallback().
@@ -1808,10 +1832,6 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
 
     float lineheight_vitoria = TextRendering_LineHeight(window) * 3.0f;
     float charwidth_vitoria = TextRendering_CharWidth(window) * 3.0f;
-
-    if(g_BolaNoBuraco) {
-        TextRendering_PrintString(window, "Voce ganhou! Parabens!", -1.0f+charwidth_vitoria, 1.0f-7.5f*lineheight_vitoria, 4.2f);
-    }
 }
 
 // Função para debugging: imprime no terminal todas informações de um modelo
@@ -2386,6 +2406,23 @@ void MenuRenderOverlay(GLFWwindow* window)
         MenuRenderLevelSelect(window);
     } else if (g_CurrentState == MENU_SETTINGS) {
         MenuRenderSettings(window);
+    } else if (g_CurrentState == MENU_LEVEL_COMPLETE) {
+        float btnW = 0.5f;
+        float btnH = 0.08f;
+        
+        glUseProgram(textprogram_id);
+        glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+        TextRendering_PrintString(window, "Nivel Completo!", -0.3f, 0.3f, 1.8f);
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        g_HoverProxPista = RenderButton(window, 0.0f, 0.05f, btnW, btnH, 
+                                        g_nivelAtual < 3 ? "Proxima Pista" : "Finalizar",
+                                        0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
+                                        
+        g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.2f, btnW, btnH, "Menu Principal",
+                                        0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
     }
 
     glDisable(GL_BLEND);
@@ -2450,12 +2487,17 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
 
     glEnable(GL_CULL_FACE);
 
-    // Buraco
+    // Passa a posição do buraco para o shader para descartar os fragmentos da pista e criar o buraco físico
     glm::vec3 hp(0.0f, 0.0f, 4.0f);
-    model = Matrix_Translate(hp.x, hp.y+0.01f, hp.z) * Matrix_Scale(0.12f, 0.001f, 0.12f);
+    glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), hp.x, hp.y, hp.z);
+
+    // Buraco
+    glDisable(GL_CULL_FACE);
+    model = Matrix_Translate(hp.x, hp.y+0.01f, hp.z) * Matrix_Scale(0.12f, 0.12f, 0.12f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
     glUniform1i(g_object_id_uniform, BURACO);
     DrawVirtualObject("the_sphere");
+    glEnable(GL_CULL_FACE);
 
     // Bandeira
     model = Matrix_Translate(hp.x+0.35f, hp.y+0.8f, hp.z) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.15f, 1.0f, 0.1f);
@@ -2475,7 +2517,14 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
 
 void MenuHandleClick(GLFWwindow* window)
 {
-    if (g_CurrentState == MENU_MAIN) {
+    if (g_CurrentState == MENU_LEVEL_COMPLETE) {
+        if (g_HoverProxPista) ProxNivel(window);
+        if (g_HoverMenuCompleto) {
+            g_CurrentState = MENU_MAIN;
+            g_nivelAtual = 1;
+        }
+    }
+    else if (g_CurrentState == MENU_MAIN) {
         if (g_HoverJogar) {
             g_CurrentState = MENU_LEVELS;
         }
@@ -2530,6 +2579,7 @@ void MenuHandleClick(GLFWwindow* window)
                     g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
                     g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
                 }
+                
                 break;
             }
         }
@@ -2561,41 +2611,41 @@ void MenuHandleClick(GLFWwindow* window)
 }
 
 void ProxNivel(GLFWwindow* window) {
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS){
+    if (g_nivelAtual < 3) {
         g_nivelAtual++;
-        if (g_nivelAtual > 3) {
-            // Voltou pro menu após completar todos os níveis
-            g_CurrentState = MENU_MAIN;
-            g_nivelAtual = 1;
-            return;
-        }
-        g_BolaNoBuraco = false;
-        g_BolaNoBuracoTwo = false;
-        g_VelocidadeBola = glm::vec3(0.0f);
-        g_VelocidadeBolaTwo = glm::vec3(0.0f);
-        g_BolaNoCaminho = false;
-        g_IndiceCaminho = 0;
-        g_ProgressoCaminho = 0.0f;
-        g_BolaNoCaminhoTwo = false;
-        g_IndiceCaminhoTwo = 0;
-        g_ProgressoCaminhoTwo = 0.0f;
-        g_BolaRotationMatrix = glm::mat4(1.0f);
-        g_BolaRotationMatrixTwo = glm::mat4(1.0f);
-        g_TacoRotacao = 0.0f;
+        g_CurrentState = PLAYING;
+    } else {
+        // Voltou pro menu após completar todos os níveis
+        g_CurrentState = MENU_MAIN;
+        g_nivelAtual = 1;
+    }
 
-        if (g_nivelAtual == 1) {
-            g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
-            g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -3.0f);
-            g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
-        } else if (g_nivelAtual == 2) {
-            g_PosBola = glm::vec3(2.9f, 0.1f, 0.5f);
-            g_PosBolaTwo = glm::vec3(2.5f, 0.1f, 0.5f);
-            g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.5f);
-        } else if (g_nivelAtual == 3) {
-            g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
-            g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
-            g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
-        }
+    g_BolaNoBuraco = false;
+    g_BolaNoBuracoTwo = false;
+    g_VelocidadeBola = glm::vec3(0.0f);
+    g_VelocidadeBolaTwo = glm::vec3(0.0f);
+    g_BolaNoCaminho = false;
+    g_IndiceCaminho = 0;
+    g_ProgressoCaminho = 0.0f;
+    g_BolaNoCaminhoTwo = false;
+    g_IndiceCaminhoTwo = 0;
+    g_ProgressoCaminhoTwo = 0.0f;
+    g_BolaRotationMatrix = glm::mat4(1.0f);
+    g_BolaRotationMatrixTwo = glm::mat4(1.0f);
+    g_TacoRotacao = 0.0f;
+
+    if (g_nivelAtual == 1) {
+        g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
+        g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -3.0f);
+        g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
+    } else if (g_nivelAtual == 2) {
+        g_PosBola = glm::vec3(2.9f, 0.1f, 0.5f);
+        g_PosBolaTwo = glm::vec3(2.5f, 0.1f, 0.5f);
+        g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.5f);
+    } else if (g_nivelAtual == 3) {
+        g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
+        g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
+        g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
     }
 }
 
@@ -2855,23 +2905,6 @@ static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
         vel -= vel * 0.9f * sub;
         if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
         if (nivel == 1) ApplyTrackCollision(pos, vel, -2.0f, 2.0f, -5.0f, 5.0f);
-        else if (nivel == 2) {
-            // PistaCurva é L-shaped: limites X dependem da posição Z
-            float min_x, max_x;
-            if (pos.z < -0.3f) {
-                // Seção inferior (reta estreita)
-                min_x = -0.83f; max_x = 0.28f;
-            } else if (pos.z > 0.2f) {
-                // Seção superior (reta estreita)
-                min_x = 2.47f; max_x = 3.32f;
-            } else {
-                // Zona de transição/curva (largura total)
-                min_x = -0.83f; max_x = 3.32f;
-            }
-            ApplyTrackCollision(pos, vel, min_x, max_x, -3.6f, 0.8f);
-            float sY = RaycastTrackHeight(g_PistaCurvaTriangles, pos.x, pos.y, pos.z, 0.0f);
-            pos.y = sY + BALL_RADIUS;
-        }
     }
     float d = glm::length(vel * dt);
     if (d > 1e-4f) {
@@ -2881,33 +2914,161 @@ static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
     }
 }
 
+static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
+                                   glm::mat4& rot_matrix, float dt,
+                                   const std::vector<TrackTriangle>& allTriangles,
+                                   const std::vector<TrackTriangle>& floorTriangles)
+{
+    const int N = std::max(1, (int)(dt / 0.004f));
+    float sub = dt / N;
+
+    for (int i = 0; i < N; i++) {
+        vel.y -= GRAVITY * sub;
+        
+        glm::vec3 next_pos = pos + vel * sub;
+
+        if (!allTriangles.empty()) {
+            glm::vec3 best_p = next_pos;
+            glm::vec3 best_n = glm::vec3(0.0f, 1.0f, 0.0f);
+            float min_dist2 = 1e9f;
+
+            for (const auto& tri : allTriangles) {
+                float min_z = std::min({tri.v0.z, tri.v1.z, tri.v2.z});
+                float max_z = std::max({tri.v0.z, tri.v1.z, tri.v2.z});
+                if (next_pos.z < min_z - 0.5f || next_pos.z > max_z + 0.5f) continue;
+                
+                float min_x = std::min({tri.v0.x, tri.v1.x, tri.v2.x});
+                float max_x = std::max({tri.v0.x, tri.v1.x, tri.v2.x});
+                if (next_pos.x < min_x - 0.5f || next_pos.x > max_x + 0.5f) continue;
+
+                glm::vec3 n;
+                glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                glm::vec3 diff = next_pos - cp;
+                float dist2 = glm::dot(diff, diff);
+                
+                if (dist2 < min_dist2 && dist2 < 0.25f) {
+                    min_dist2 = dist2;
+                    best_p = cp;
+                    best_n = n;
+                }
+            }
+
+            if (min_dist2 < 0.25f) {
+                float vel_normal = glm::dot(vel, best_n);
+                bool isSideWall = (best_n.y < 0.1f);
+
+                if (isSideWall) {
+                    glm::vec3 flat_n = glm::normalize(glm::vec3(best_n.x, 0.0f, best_n.z));
+                    if (vel_normal < 0.0f) {
+                        float flat_vel_normal = glm::dot(vel, flat_n);
+                        if (flat_vel_normal < 0.0f) {
+                            vel -= flat_n * flat_vel_normal * 1.5f; 
+                        }
+                    }
+                    float dist_to_plane = glm::dot(next_pos - best_p, flat_n);
+                    if (dist_to_plane < BALL_RADIUS) {
+                        pos = next_pos + flat_n * (BALL_RADIUS - dist_to_plane);
+                    } else {
+                        pos = next_pos; 
+                    }
+                } else {
+                    pos = best_p + best_n * BALL_RADIUS;
+                    if (vel_normal < 0.0f) {
+                        vel -= best_n * vel_normal; 
+                    }
+                }
+                
+                vel -= vel * 0.2f * sub;
+            } else {
+                pos = next_pos;
+                float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
+                if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
+                    pos.y = sY + BALL_RADIUS;
+                    vel.y = 0.0f;
+                }
+            }
+        }
+        
+        if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
+    }
+    
+    float d = glm::length(vel * dt);
+    if (d > 1e-4f) {
+        glm::vec4 ax(vel.z, 0, -vel.x, 0);
+        float al = norm(ax);
+        if (al > 1e-4f) rot_matrix = Matrix_Rotate(d / BALL_RADIUS, ax / al) * rot_matrix;
+    }
+}
+
 void AtualizarFisicaBola(float delta_time) {
-    if (g_nivelAtual == 3)
-        AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_BolaNoCaminho,
-                            g_IndiceCaminho, g_ProgressoCaminho,
-                            g_BolaRotationMatrix, delta_time);
-    else
-        AtualizarFisicaSubstep(g_PosBola, g_VelocidadeBola,
-                               g_BolaRotationMatrix, delta_time, g_nivelAtual);
-    if (glm::length(glm::vec2(g_PosBola.x - g_HolePosition.x, g_PosBola.z - g_HolePosition.z)) < 0.15f) {
-        g_BolaNoBuraco = true; g_VelocidadeBola = glm::vec3(0.0f);
-        g_PosBola = glm::vec3(g_HolePosition.x, -0.05f, g_HolePosition.z);
-        g_BolaNoCaminho = false; ClearTrail();
+    glm::vec2 diff = glm::vec2(g_PosBola.x - g_HolePosition.x, g_PosBola.z - g_HolePosition.z);
+    float distToHole = glm::length(diff);
+    
+    if (distToHole < 0.09f && g_PosBola.y <= g_HolePosition.y + 0.03f) {
+        // Snap to center and kill horizontal velocity so it can't escape
+        g_PosBola.x = g_HolePosition.x;
+        g_PosBola.z = g_HolePosition.z;
+        g_VelocidadeBola.x = 0.0f;
+        g_VelocidadeBola.z = 0.0f;
+        
+        // Freefall perfectly straight down
+        g_VelocidadeBola.y -= 9.8f * delta_time;
+        g_PosBola.y += g_VelocidadeBola.y * delta_time;
+        
+        // Stop exactly at the bottom and end level instantly
+        float bottom_y = g_HolePosition.y - 0.10f;
+        if (g_PosBola.y <= bottom_y + BALL_RADIUS) {
+            g_PosBola.y = bottom_y + BALL_RADIUS;
+            g_VelocidadeBola = glm::vec3(0.0f);
+            g_BolaNoBuraco = true;
+            ClearTrail();
+        }
+    } else {
+        if (g_nivelAtual == 3)
+            AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_BolaNoCaminho,
+                                g_IndiceCaminho, g_ProgressoCaminho,
+                                g_BolaRotationMatrix, delta_time);
+        else if (g_nivelAtual == 2)
+            AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
+                                   g_BolaRotationMatrix, delta_time,
+                                   g_PistaCurvaAllTriangles, g_PistaCurvaTriangles);
+        else
+            AtualizarFisicaSubstep(g_PosBola, g_VelocidadeBola,
+                                   g_BolaRotationMatrix, delta_time, g_nivelAtual);
     }
 }
 
 void AtualizarFisicaBolaTwo(float delta_time) {
-    if (g_nivelAtual == 3)
-        AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_BolaNoCaminhoTwo,
-                            g_IndiceCaminhoTwo, g_ProgressoCaminhoTwo,
-                            g_BolaRotationMatrixTwo, delta_time);
-    else
-        AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
-                               g_BolaRotationMatrixTwo, delta_time, g_nivelAtual);
-    if (glm::length(glm::vec2(g_PosBolaTwo.x - g_HolePosition.x, g_PosBolaTwo.z - g_HolePosition.z)) < 0.15f) {
-        g_BolaNoBuracoTwo = true; g_VelocidadeBolaTwo = glm::vec3(0.0f);
-        g_PosBolaTwo = glm::vec3(g_HolePosition.x, -0.05f, g_HolePosition.z);
-        g_BolaNoCaminhoTwo = false; ClearTrail2();
+    glm::vec2 diff = glm::vec2(g_PosBolaTwo.x - g_HolePosition.x, g_PosBolaTwo.z - g_HolePosition.z);
+    float distToHole = glm::length(diff);
+    
+    if (distToHole < 0.09f && g_PosBolaTwo.y <= g_HolePosition.y + 0.03f) {
+        // Snap to center and kill horizontal velocity so it can't escape
+        g_PosBolaTwo.x = g_HolePosition.x;
+        g_PosBolaTwo.z = g_HolePosition.z;
+        g_VelocidadeBolaTwo.x = 0.0f;
+        g_VelocidadeBolaTwo.z = 0.0f;
+        
+        // Freefall perfectly straight down
+        g_VelocidadeBolaTwo.y -= 9.8f * delta_time;
+        g_PosBolaTwo.y += g_VelocidadeBolaTwo.y * delta_time;
+        
+        // Stop exactly at the bottom and end level instantly
+        float bottom_y = g_HolePosition.y - 0.10f;
+        if (g_PosBolaTwo.y <= bottom_y + BALL_RADIUS) {
+            g_PosBolaTwo.y = bottom_y + BALL_RADIUS;
+            g_VelocidadeBolaTwo = glm::vec3(0.0f);
+            g_BolaNoBuracoTwo = true;
+            ClearTrail2();
+        }
+    } else {
+        if (g_nivelAtual == 3)
+            AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_BolaNoCaminhoTwo,
+                                g_IndiceCaminhoTwo, g_ProgressoCaminhoTwo,
+                                g_BolaRotationMatrixTwo, delta_time);
+        else
+            AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
+                                   g_BolaRotationMatrixTwo, delta_time, g_nivelAtual);
     }
 }
 
@@ -2931,6 +3092,16 @@ static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
     bool hit = false;
 
     for (const auto& tri : tris) {
+        float minX = tri.v0.x; if (tri.v1.x < minX) minX = tri.v1.x; if (tri.v2.x < minX) minX = tri.v2.x;
+        if (x < minX) continue;
+        float maxX = tri.v0.x; if (tri.v1.x > maxX) maxX = tri.v1.x; if (tri.v2.x > maxX) maxX = tri.v2.x;
+        if (x > maxX) continue;
+
+        float minZ = tri.v0.z; if (tri.v1.z < minZ) minZ = tri.v1.z; if (tri.v2.z < minZ) minZ = tri.v2.z;
+        if (z < minZ) continue;
+        float maxZ = tri.v0.z; if (tri.v1.z > maxZ) maxZ = tri.v1.z; if (tri.v2.z > maxZ) maxZ = tri.v2.z;
+        if (z > maxZ) continue;
+
         glm::vec3 e1 = tri.v1 - tri.v0;
         glm::vec3 e2 = tri.v2 - tri.v0;
         glm::vec3 h = glm::cross(dir, e2);

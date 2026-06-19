@@ -51,6 +51,7 @@ uniform int u_TexturaBola;         // 0=white, 1=brick, 2=rocky
 uniform int u_TexturaTaco;         // 0=metal, 1=textured, 2=brick
 uniform vec3 u_TrailColor;         // Cor da trilha (RGB)
 uniform float u_TrailOpacity;      // Opacidade da trilha (0.0 a 1.0)
+uniform vec3 u_HolePosition;       // Posicao do buraco no mundo
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
 uniform vec4 bbox_min;
@@ -97,9 +98,11 @@ void main()
     float V = 0.0;
 
 	// Coeficiente de refletância difusa
-	vec3 Kd0 = vec3(0.5, 0.5, 0.5);
+    vec3 Kd0 = vec3(0.5, 0.5, 0.5);
     vec3 Ks = vec3(0.0, 0.0, 0.0);
     float q = 1.0;
+
+    vec4 position_world = model * position_model;
 
     if ( object_id == SPHERE )
     {
@@ -198,7 +201,8 @@ void main()
     }
     else if ( object_id == BURACO )
     {
-        Kd0 = vec3(0.02, 0.02, 0.02); // buraco quase preto
+        if (position_model.y > 0.0) discard; // discard top half of the sphere cup
+        Kd0 = vec3(0.1, 0.1, 0.1); // buraco escurinho
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
@@ -216,12 +220,14 @@ void main()
     }
     else if ( object_id == GRAMA )
     {
+        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.5) discard;
         Kd0 = vec3(0.1, 0.6, 0.1); // grama viva
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
     else if ( object_id == PISTA_CHAO )
     {
+        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
         U = texcoords.x;
         V = texcoords.y;
         if (u_TexturaGramaPista == 0)
@@ -244,6 +250,7 @@ void main()
     }
     else if ( object_id == PISTALOOP || object_id == PISTACURVA )
     {
+        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
         // Gerar UVs procedurais a partir da posição em world space
         vec4 world_pos = model * position_model;
         // Normal em world space para distinguir chão vs parede
