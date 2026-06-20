@@ -640,13 +640,22 @@ int main(int argc, char* argv[])
         // Passa a posição do buraco para o shader para descartar os fragmentos da pista e criar o buraco físico
         glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), g_HolePosition.x, g_HolePosition.y, g_HolePosition.z);
 
+        // Montanha de grama que sobe para abraçar o buraco por fora (esconde a protuberância)
+        if (g_nivelAtual == 2 || g_nivelAtual == 3) {
+            model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y - 0.15f, g_HolePosition.z) * Matrix_Scale(0.6f, 0.12f, 0.6f);
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, GRAMA);
+            DrawVirtualObject("the_sphere");
+        }
+
         // Buraco (Copo de esfera invertida)
-        glDisable(GL_CULL_FACE); // Permitir ver a parte de dentro da esfera
+        glEnable(GL_CULL_FACE); // Permitir ver a parte de dentro da esfera mas esconder o fundo de fora
+        glCullFace(GL_FRONT);
         model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z) * Matrix_Scale(0.12f, 0.12f, 0.12f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BURACO);
         DrawVirtualObject("the_sphere");
-        glEnable(GL_CULL_FACE); // Reativar o culling
+        glCullFace(GL_BACK); // Reativar o culling normal
 
         // Renderiza a trilha da bola
         glUseProgram(g_GpuProgramID);
@@ -2570,9 +2579,9 @@ void MenuHandleClick(GLFWwindow* window)
                     g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
                 } else if (g_nivelAtual == 2) {
                     // PistaCurva: spawn no centro da seção larga, hole no final
-                    g_PosBola = glm::vec3(2.9f, 0.1f, 0.5f);
-                    g_PosBolaTwo = glm::vec3(2.5f, 0.1f, 0.5f);
-                    g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.5f);
+                    g_PosBola = glm::vec3(3.0f, 0.1f, -1.0f);
+                    g_PosBolaTwo = glm::vec3(2.7f, 0.1f, -1.0f);
+                    g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.3f);
                 } else if (g_nivelAtual == 3) {
                     // PistaLoop: spawn no início, hole no fim
                     g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
@@ -2639,9 +2648,9 @@ void ProxNivel(GLFWwindow* window) {
         g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -3.0f);
         g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
     } else if (g_nivelAtual == 2) {
-        g_PosBola = glm::vec3(2.9f, 0.1f, 0.5f);
-        g_PosBolaTwo = glm::vec3(2.5f, 0.1f, 0.5f);
-        g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.5f);
+        g_PosBola = glm::vec3(3.0f, 0.1f, -1.0f);
+        g_PosBolaTwo = glm::vec3(2.7f, 0.1f, -1.0f);
+        g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.3f);
     } else if (g_nivelAtual == 3) {
         g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
         g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
@@ -3004,7 +3013,7 @@ void AtualizarFisicaBola(float delta_time) {
     glm::vec2 diff = glm::vec2(g_PosBola.x - g_HolePosition.x, g_PosBola.z - g_HolePosition.z);
     float distToHole = glm::length(diff);
     
-    if (distToHole < 0.09f && g_PosBola.y <= g_HolePosition.y + 0.03f) {
+    if (distToHole < 0.11f && g_PosBola.y <= g_HolePosition.y + 0.10f) {
         // Snap to center and kill horizontal velocity so it can't escape
         g_PosBola.x = g_HolePosition.x;
         g_PosBola.z = g_HolePosition.z;
@@ -3042,7 +3051,7 @@ void AtualizarFisicaBolaTwo(float delta_time) {
     glm::vec2 diff = glm::vec2(g_PosBolaTwo.x - g_HolePosition.x, g_PosBolaTwo.z - g_HolePosition.z);
     float distToHole = glm::length(diff);
     
-    if (distToHole < 0.09f && g_PosBolaTwo.y <= g_HolePosition.y + 0.03f) {
+    if (distToHole < 0.11f && g_PosBolaTwo.y <= g_HolePosition.y + 0.10f) {
         // Snap to center and kill horizontal velocity so it can't escape
         g_PosBolaTwo.x = g_HolePosition.x;
         g_PosBolaTwo.z = g_HolePosition.z;

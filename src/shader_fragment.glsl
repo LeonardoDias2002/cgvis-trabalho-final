@@ -202,6 +202,7 @@ void main()
     else if ( object_id == BURACO )
     {
         if (position_model.y > 0.0) discard; // discard top half of the sphere cup
+        if (camera_position.y < u_HolePosition.y - 0.05) discard; // do not render if camera is below the hole
         Kd0 = vec3(0.1, 0.1, 0.1); // buraco escurinho
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
@@ -220,14 +221,16 @@ void main()
     }
     else if ( object_id == GRAMA )
     {
-        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.5) discard;
+        vec2 d = position_world.xz - u_HolePosition.xz;
+        if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.5) discard;
         Kd0 = vec3(0.1, 0.6, 0.1); // grama viva
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
     else if ( object_id == PISTA_CHAO )
     {
-        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
+        vec2 d = position_world.xz - u_HolePosition.xz;
+        if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
         U = texcoords.x;
         V = texcoords.y;
         if (u_TexturaGramaPista == 0)
@@ -250,7 +253,8 @@ void main()
     }
     else if ( object_id == PISTALOOP || object_id == PISTACURVA )
     {
-        if (distance(position_world.xz, u_HolePosition.xz) < 0.12 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
+        vec2 d = position_world.xz - u_HolePosition.xz;
+        if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
         // Gerar UVs procedurais a partir da posição em world space
         vec4 world_pos = model * position_model;
         // Normal em world space para distinguir chão vs parede
