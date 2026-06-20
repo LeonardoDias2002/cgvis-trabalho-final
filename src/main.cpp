@@ -746,6 +746,12 @@ int main(int argc, char* argv[])
             glUniform1i(g_object_id_uniform, PISTACURVA);
             DrawVirtualObject("PistaCurva");
             glEnable(GL_CULL_FACE);
+
+            model = Matrix_Translate(0.0f, 0.064f, 0.0f) * Matrix_Scale(0.25f, 0.25f, 0.25f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BORDASCURVA);
+            DrawVirtualObject("PistaCurva_bordas");
+            glEnable(GL_CULL_FACE);
         }
 
         // Desenha a Pista em loop (nível 3)
@@ -757,6 +763,12 @@ int main(int argc, char* argv[])
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTALOOP);
             DrawVirtualObject("loop");
+            glEnable(GL_CULL_FACE);
+
+            model = Matrix_Translate(0.0f, 1.12f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BORDASLOOP);
+            DrawVirtualObject("bordas_loop");
             glEnable(GL_CULL_FACE);
         }
 

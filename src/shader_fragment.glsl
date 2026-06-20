@@ -41,6 +41,10 @@ uniform mat4 projection;
 #define ARVORE_BAIXA 16
 #define CACTUS 17
 #define PISTACURVA 18
+#define PISTASIMPLES 19
+#define BORDASSIMPLES 20
+#define BORDASCURVA 21
+#define BORDASLOOP 22
 
 
 uniform int object_id;
