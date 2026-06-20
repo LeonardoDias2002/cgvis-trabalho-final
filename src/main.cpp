@@ -642,7 +642,7 @@ int main(int argc, char* argv[])
 
         // Montanha de grama que sobe para abraçar o buraco por fora (esconde a protuberância)
         if (g_nivelAtual == 2 || g_nivelAtual == 3) {
-            model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y - 0.15f, g_HolePosition.z) * Matrix_Scale(0.6f, 0.12f, 0.6f);
+            model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y - 0.15f, g_HolePosition.z) * Matrix_Scale(0.6f, 0.14f, 0.6f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GRAMA);
             DrawVirtualObject("the_sphere");
@@ -2966,35 +2966,77 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                 float max_x = std::max({tri.v0.x, tri.v1.x, tri.v2.x});
                 if (next_pos.x < min_x - 0.5f || next_pos.x > max_x + 0.5f) continue;
 
-                glm::vec3 n;
-                glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
-                glm::vec3 diff = next_pos - cp;
-                float dist2 = glm::dot(diff, diff);
+                glm::vec3 ab = tri.v1 - tri.v0;
+                glm::vec3 ac = tri.v2 - tri.v0;
+                glm::vec3 face_normal = glm::cross(ab, ac);
+                float face_len = glm::length(face_normal);
+                if (face_len < 1e-6f) continue; 
+                face_normal /= face_len;
+                
+                // Superfícies inclinadas mais de ~45 graus são paredes
+                bool isWall = (std::abs(face_normal.y) < 0.7f);
+                
+                glm::vec3 test_pos = next_pos;
+                bool extruded = false;
+                if (isWall) {
+                    float wall_y = (tri.v0.y + tri.v1.y + tri.v2.y) / 3.0f;
+                    test_pos.y = wall_y; 
+                    extruded = true;
+                }
+
+                glm::vec3 dummy_n;
+                glm::vec3 cp = ClosestPointOnTriangle(test_pos, tri.v0, tri.v1, tri.v2, dummy_n);
+                glm::vec3 diff = test_pos - cp;
+                float diff_len = glm::length(diff);
+                
+                // Se a parede foi extrudada, verificamos se a bola está DENTRO da largura física da parede
+                if (extruded && diff_len > 1e-4f) {
+                    float alignment = std::abs(glm::dot(diff / diff_len, face_normal));
+                    // Se alignment < 0.95, a bola passou da quina lateral da parede!
+                    if (alignment < 0.95f) {
+                        // Desfaz a extrusão para não criar paredes invisíveis infinitas para os lados
+                        test_pos = next_pos;
+                        cp = ClosestPointOnTriangle(test_pos, tri.v0, tri.v1, tri.v2, dummy_n);
+                        diff = test_pos - cp;
+                        diff_len = glm::length(diff);
+                    }
+                }
+                
+                float dist2 = diff_len * diff_len;
                 
                 if (dist2 < min_dist2 && dist2 < 0.25f) {
                     min_dist2 = dist2;
                     best_p = cp;
-                    best_n = n;
+                    best_n = face_normal;
                 }
             }
 
             if (min_dist2 < 0.25f) {
                 float vel_normal = glm::dot(vel, best_n);
-                bool isSideWall = (best_n.y < 0.1f);
+                bool isSideWall = (std::abs(best_n.y) < 0.7f);
 
                 if (isSideWall) {
-                    glm::vec3 flat_n = glm::normalize(glm::vec3(best_n.x, 0.0f, best_n.z));
-                    if (vel_normal < 0.0f) {
-                        float flat_vel_normal = glm::dot(vel, flat_n);
-                        if (flat_vel_normal < 0.0f) {
-                            vel -= flat_n * flat_vel_normal * 1.5f; 
+                    glm::vec2 n2(best_n.x, best_n.z);
+                    float n2_len = glm::length(n2);
+                    if (n2_len > 1e-4f) { // Previne NaN
+                        glm::vec3 flat_n = glm::vec3(best_n.x / n2_len, 0.0f, best_n.z / n2_len);
+                        
+                        if (vel_normal < 0.0f) {
+                            float flat_vel_normal = glm::dot(vel, flat_n);
+                            if (flat_vel_normal < 0.0f) {
+                                vel -= flat_n * flat_vel_normal * 1.5f; 
+                            }
                         }
-                    }
-                    float dist_to_plane = glm::dot(next_pos - best_p, flat_n);
-                    if (dist_to_plane < BALL_RADIUS) {
-                        pos = next_pos + flat_n * (BALL_RADIUS - dist_to_plane);
+                        float dist_to_plane = glm::dot(glm::vec3(next_pos.x - best_p.x, 0.0f, next_pos.z - best_p.z), flat_n);
+                        if (dist_to_plane < BALL_RADIUS) {
+                            pos.x = next_pos.x + flat_n.x * (BALL_RADIUS - dist_to_plane);
+                            pos.z = next_pos.z + flat_n.z * (BALL_RADIUS - dist_to_plane);
+                            pos.y = next_pos.y; // IMPORTANTE: Preserva o voo vertical da bola!
+                        } else {
+                            pos = next_pos; 
+                        }
                     } else {
-                        pos = next_pos; 
+                        pos = next_pos;
                     }
                 } else {
                     pos = best_p + best_n * BALL_RADIUS;
@@ -3006,11 +3048,14 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                 vel -= vel * 0.2f * sub;
             } else {
                 pos = next_pos;
-                float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
-                if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
-                    pos.y = sY + BALL_RADIUS;
-                    vel.y = 0.0f;
-                }
+            }
+            
+            // Garantia de Colisão com o Chão (Floor Raycast)
+            // Impede que caia no infinito caso a física falhe por alta velocidade
+            float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
+            if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
+                pos.y = sY + BALL_RADIUS;
+                if (vel.y < 0.0f) vel.y = 0.0f;
             }
         }
         
