@@ -145,7 +145,8 @@ std::vector<TrackTriangle> g_PistaLoopAllTriangles;
 // ========== SISTEMA DE MENU ==========
 GameState g_CurrentState = MENU_MAIN;
 float g_MenuCameraAngle = 0.0f;
-float g_MasterVolume = 0.8f;
+float g_MusicVolume = 0.8f;
+float g_AmbientVolume = 0.8f;
 int g_TexturaPistaGrama = 0;  // 0=rocky, 1=brick, 2=solid green
 int g_TexturaPistaParede = 0; // 0=rocky, 1=brick, 2=solid gray
 int g_TexturaBola = 0;        // 0=white, 1=brick, 2=rocky
@@ -164,7 +165,10 @@ bool g_HoverGramaL = false, g_HoverGramaR = false;
 bool g_HoverParedeL = false, g_HoverParedeR = false;
 bool g_HoverBolaL = false, g_HoverBolaR = false;
 bool g_HoverTacoL = false, g_HoverTacoR = false;
-bool g_HoverProxPista = false, g_HoverMenuCompleto = false;
+bool g_HoverProxPista = false;
+bool g_HoverMenuCompleto = false;
+bool g_HoverContinuar = false;
+bool g_HoverSairPause = false;
 
 // Posição do cursor 
 double g_LastCursorPosX, g_LastCursorPosY;

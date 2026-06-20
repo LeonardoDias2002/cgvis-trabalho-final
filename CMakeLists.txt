@@ -14,6 +14,7 @@ set(SOURCES
   src/glad.c
   src/globals.cpp
   src/trail.cpp
+  src/audio.cpp
 )
 
 if(WIN32)

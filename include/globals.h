@@ -149,7 +149,7 @@ struct SceneObject
 // =============================================
 
 
-enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING, MENU_LEVEL_COMPLETE };
+enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING, MENU_LEVEL_COMPLETE, MENU_PAUSE };
 
 // =============================================
 // VARIÁVEIS GLOBAIS (extern — definidas em globals.cpp)
@@ -272,7 +272,8 @@ extern std::vector<TrackTriangle> g_PistaLoopAllTriangles; // ALL triangles for 
 // --- Sistema de Menu ---
 extern GameState g_CurrentState;
 extern float g_MenuCameraAngle;
-extern float g_MasterVolume;
+extern float g_MusicVolume;
+extern float g_AmbientVolume;
 extern int g_TexturaPistaGrama;
 extern int g_TexturaPistaParede;
 extern int g_TexturaBola;
@@ -292,6 +293,7 @@ extern bool g_HoverParedeL, g_HoverParedeR;
 extern bool g_HoverBolaL, g_HoverBolaR;
 extern bool g_HoverTacoL, g_HoverTacoR;
 extern bool g_HoverProxPista, g_HoverMenuCompleto;
+extern bool g_HoverContinuar, g_HoverSairPause;
 
 // --- Posição do cursor (para cálculo de delta no mouse) ---
 extern double g_LastCursorPosX, g_LastCursorPosY;

@@ -127,6 +127,16 @@ extern GLuint textprogram_id;
 
 static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris, float x, float current_y, float z, float fallbackY);
 
+// Áudio Globals
+#include "miniaudio.h"
+ma_engine g_audioEngine;
+ma_sound g_musicMenu;
+ma_sound g_ambientSound;
+ma_sound g_hitSound;
+ma_sound g_victorySound;
+ma_sound g_wallSound;
+bool g_audioInitialized = false;
+
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -387,6 +397,32 @@ int main(int argc, char* argv[])
 
     float previous_time = (float)glfwGetTime();
 
+    if (ma_engine_init(NULL, &g_audioEngine) == MA_SUCCESS) {
+        g_audioInitialized = true;
+        ma_sound_init_from_file(&g_audioEngine, "../../data/menu.mp3", MA_SOUND_FLAG_STREAM, NULL, NULL, &g_musicMenu);
+        ma_sound_set_looping(&g_musicMenu, MA_TRUE);
+        ma_sound_init_from_file(&g_audioEngine, "../../data/ambiente.mp3", MA_SOUND_FLAG_STREAM, NULL, NULL, &g_ambientSound);
+        ma_sound_set_looping(&g_ambientSound, MA_TRUE);
+        
+        // Efeitos sonoros na memória
+        ma_sound_init_from_file(&g_audioEngine, "../../data/hit.wav", 0, NULL, NULL, &g_hitSound);
+        ma_sound_init_from_file(&g_audioEngine, "../../data/vitoria.mp3", 0, NULL, NULL, &g_victorySound);
+        ma_sound_init_from_file(&g_audioEngine, "../../data/wall.wav", 0, NULL, NULL, &g_wallSound);
+        
+        // Volumes iniciais
+        ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
+        ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
+        ma_sound_set_volume(&g_hitSound, g_AmbientVolume);
+        ma_sound_set_volume(&g_victorySound, g_AmbientVolume);
+        ma_sound_set_volume(&g_wallSound, g_AmbientVolume);
+        
+        // Inicia música do menu
+        if (g_CurrentState != PLAYING) {
+            ma_sound_start(&g_musicMenu);
+            ma_sound_set_fade_in_milliseconds(&g_musicMenu, 0.0f, 1.0f, 3000);
+        }
+    }
+
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -395,7 +431,7 @@ int main(int argc, char* argv[])
         previous_time = current_time;
 
         // ===== MENU MODE: renderiza menu e pula gameplay =====
-        if (g_CurrentState != PLAYING && g_CurrentState != MENU_LEVEL_COMPLETE) {
+        if (g_CurrentState != PLAYING && g_CurrentState != MENU_LEVEL_COMPLETE && g_CurrentState != MENU_PAUSE) {
             glClearColor(0.05f, 0.08f, 0.12f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             MenuUpdate(window, delta_time);
@@ -403,6 +439,9 @@ int main(int argc, char* argv[])
             glfwPollEvents();
             continue;
         }
+        
+        // Se estiver no MENU_LEVEL_COMPLETE ou MENU_PAUSE, queremos que a cena do jogo ainda seja desenhada por trás do overlay!
+        // Então não damos 'continue', deixamos o render normal acontecer, e só bloqueamos as atualizações físicas.
 
         if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuracoTwo && 
         !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
@@ -415,18 +454,20 @@ int main(int argc, char* argv[])
         }
 
         // Atualização da física da bola
-        if (!g_BolaNoBuraco && !g_JogadorAtual) {
-            AtualizarFisicaBola(delta_time);
-            // Atualiza a trilha da bola 1
-            if (glm::length(g_VelocidadeBola) > 0.01f) {
-                UpdateTrail(g_PosBola, g_LastTrailPosBola, delta_time);
-            }
-        } else if (!g_BolaNoBuracoTwo && g_JogadorAtual)
-        {
-            AtualizarFisicaBolaTwo(delta_time);
-            // Atualiza a trilha da bola 2
-            if (glm::length(g_VelocidadeBolaTwo) > 0.01f) {
-                UpdateTrail2(g_PosBolaTwo, g_LastTrailPosBola2, delta_time);
+        if (g_CurrentState == PLAYING) {
+            if (!g_BolaNoBuraco && !g_JogadorAtual) {
+                AtualizarFisicaBola(delta_time);
+                // Atualiza a trilha da bola 1
+                if (glm::length(g_VelocidadeBola) > 0.01f) {
+                    UpdateTrail(g_PosBola, g_LastTrailPosBola, delta_time);
+                }
+            } else if (!g_BolaNoBuracoTwo && g_JogadorAtual)
+            {
+                AtualizarFisicaBolaTwo(delta_time);
+                // Atualiza a trilha da bola 2
+                if (glm::length(g_VelocidadeBolaTwo) > 0.01f) {
+                    UpdateTrail2(g_PosBolaTwo, g_LastTrailPosBola2, delta_time);
+                }
             }
         }
         
@@ -772,14 +813,14 @@ int main(int argc, char* argv[])
         // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
         TextRendering_ShowProjection(window);
 
-        // Imprimimos na tela informação sobre o número de quadros renderizados
-        // por segundo (frames per second).
-        TextRendering_ShowFramesPerSecond(window);
+            // Imprimimos na tela informação sobre o número de quadros renderizados
+            // por segundo (frames per second).
+            TextRendering_ShowFramesPerSecond(window);
 
-        // Se o nível foi concluído, renderizar a UI do menu de fase por cima de tudo
-        if (g_CurrentState == MENU_LEVEL_COMPLETE) {
-            MenuRenderOverlay(window);
-        }
+            // Se o nível foi concluído, renderizar a UI do menu de fase por cima de tudo
+            if (g_CurrentState == MENU_LEVEL_COMPLETE || g_CurrentState == MENU_PAUSE) {
+                MenuRenderOverlay(window);
+            }
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -797,6 +838,14 @@ int main(int argc, char* argv[])
     }
 
     // Finalizamos o uso dos recursos do sistema operacional
+    if (g_audioInitialized) {
+        ma_sound_uninit(&g_musicMenu);
+        ma_sound_uninit(&g_ambientSound);
+        ma_sound_uninit(&g_hitSound);
+        ma_sound_uninit(&g_victorySound);
+        ma_sound_uninit(&g_wallSound);
+        ma_engine_uninit(&g_audioEngine);
+    }
     glfwTerminate();
 
     // Fim do programa
@@ -1299,6 +1348,13 @@ void RotacionarTaco(GLFWwindow* window)
         // Fase 2: Impacto Físico
         if (!bola_atingida && !g_BolaNoBuraco) {
             bola_atingida = true;
+            
+            if (g_audioInitialized) {
+                ma_sound_set_volume(&g_hitSound, g_AmbientVolume);
+                ma_sound_seek_to_pcm_frame(&g_hitSound, 0);
+                ma_sound_start(&g_hitSound);
+            }
+            
             float forca = std::max(2.0f, g_ForcaTacada); 
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
@@ -1624,7 +1680,7 @@ void Correcao_KeyCallback(int key, int action, int mod);
 // tecla do teclado. Veja http://www.glfw.org/docs/latest/input_guide.html#input_key
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    if (g_CurrentState == MENU_MAIN || g_CurrentState == MENU_LEVELS || g_CurrentState == MENU_SETTINGS || g_CurrentState == MENU_LEVEL_COMPLETE) {
+    if (g_CurrentState == MENU_MAIN || g_CurrentState == MENU_LEVELS || g_CurrentState == MENU_SETTINGS || g_CurrentState == MENU_LEVEL_COMPLETE || g_CurrentState == MENU_PAUSE) {
         MenuRenderOverlay(window);
         return;
     }
@@ -1637,9 +1693,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // Se o usuário pressionar a tecla ESC, fechamos a janela.
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         if (g_CurrentState == PLAYING) {
-            g_CurrentState = MENU_MAIN;
+            g_CurrentState = MENU_PAUSE;
+            if (g_audioInitialized) {
+                ma_sound_stop(&g_ambientSound);
+                ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
+                ma_sound_start(&g_musicMenu);
+                ma_sound_set_fade_in_milliseconds(&g_musicMenu, 0.0f, 1.0f, 2000);
+            }
             g_LeftMouseButtonPressed = false;
             g_RightMouseButtonPressed = false;
+        } else if (g_CurrentState == MENU_PAUSE) {
+            g_CurrentState = PLAYING;
+            if (g_audioInitialized) {
+                ma_sound_stop(&g_musicMenu);
+                ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
+                ma_sound_start(&g_ambientSound);
+            }
         } else if (g_CurrentState == MENU_LEVELS || g_CurrentState == MENU_SETTINGS) {
             g_CurrentState = MENU_MAIN;
         } else {
@@ -2319,18 +2388,33 @@ void MenuRenderSettings(GLFWwindow* window)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Volume
+    // Volume Musica
     glUseProgram(textprogram_id);
     glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
-    TextRendering_PrintString(window, "Volume:", -0.55f, 0.50f, 1.5f);
+    TextRendering_PrintString(window, "Musica:", -0.55f, 0.55f, 1.5f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    RenderSlider(window, 0.15f, 0.50f, 0.30f, 0.025f, g_MasterVolume);
-    char volBuf[8];
-    snprintf(volBuf, 8, "%d%%", (int)(g_MasterVolume*100));
+    RenderSlider(window, 0.15f, 0.55f, 0.30f, 0.025f, g_MusicVolume);
+    char volMusBuf[8];
+    snprintf(volMusBuf, 8, "%d%%", (int)(g_MusicVolume*100));
     glUseProgram(textprogram_id);
     glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
-    TextRendering_PrintString(window, volBuf, 0.50f, 0.48f, 1.5f);
+    TextRendering_PrintString(window, volMusBuf, 0.50f, 0.53f, 1.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Volume Ambiente
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, "Ambiente:", -0.55f, 0.45f, 1.5f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    RenderSlider(window, 0.15f, 0.45f, 0.30f, 0.025f, g_AmbientVolume);
+    char volAmbBuf[8];
+    snprintf(volAmbBuf, 8, "%d%%", (int)(g_AmbientVolume*100));
+    glUseProgram(textprogram_id);
+    glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+    TextRendering_PrintString(window, volAmbBuf, 0.50f, 0.43f, 1.5f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -2448,6 +2532,22 @@ void MenuRenderOverlay(GLFWwindow* window)
                                         
         g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.2f, btnW, btnH, "Menu Principal",
                                         0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
+    } else if (g_CurrentState == MENU_PAUSE) {
+        float btnW = 0.5f;
+        float btnH = 0.08f;
+        
+        glUseProgram(textprogram_id);
+        glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
+        TextRendering_PrintString(window, "JOGO PAUSADO", -0.25f, 0.3f, 1.8f);
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        g_HoverContinuar = RenderButton(window, 0.0f, 0.05f, btnW, btnH, "Continuar",
+                                        0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
+                                        
+        g_HoverSairPause = RenderButton(window, 0.0f, -0.2f, btnW, btnH, "Sair para o Menu",
+                                        0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
     }
 
     glDisable(GL_BLEND);
@@ -2547,6 +2647,26 @@ void MenuHandleClick(GLFWwindow* window)
         if (g_HoverMenuCompleto) {
             g_CurrentState = MENU_MAIN;
             g_nivelAtual = 1;
+            if (g_audioInitialized) {
+                ma_sound_stop(&g_ambientSound);
+                ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
+                ma_sound_start(&g_musicMenu);
+                ma_sound_set_fade_in_milliseconds(&g_musicMenu, 0.0f, 1.0f, 2000);
+            }
+        }
+    }
+    else if (g_CurrentState == MENU_PAUSE) {
+        if (g_HoverContinuar) {
+            g_CurrentState = PLAYING;
+            if (g_audioInitialized) {
+                ma_sound_stop(&g_musicMenu);
+                ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
+                ma_sound_start(&g_ambientSound);
+            }
+        }
+        if (g_HoverSairPause) {
+            g_CurrentState = MENU_MAIN;
+            g_nivelAtual = 1;
         }
     }
     else if (g_CurrentState == MENU_MAIN) {
@@ -2571,6 +2691,11 @@ void MenuHandleClick(GLFWwindow* window)
             float bx = startX + i * spacing;
             if (IsMouseOverRect(window, bx, 0.15f, btnSize, btnSize)) {
                 g_CurrentState = PLAYING;
+                if (g_audioInitialized) {
+                    ma_sound_stop(&g_musicMenu);
+                    ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
+                    ma_sound_start(&g_ambientSound);
+                }
                 g_nivelAtual = i + 1;
 
                 // Reset do estado do jogo
@@ -2611,17 +2736,26 @@ void MenuHandleClick(GLFWwindow* window)
     }
     else if (g_CurrentState == MENU_SETTINGS) {
         if (g_HoverVoltar) g_CurrentState = MENU_MAIN;
-        // Volume slider clique
-        if (IsMouseOverRect(window, 0.15f, 0.50f, 0.30f, 0.025f)) {
+        // Volume sliders clique
+        if (IsMouseOverRect(window, 0.15f, 0.55f, 0.30f, 0.025f) || IsMouseOverRect(window, 0.15f, 0.45f, 0.30f, 0.025f)) {
             double mx, my;
             glfwGetCursorPos(window, &mx, &my);
             int ww, wh;
             glfwGetWindowSize(window, &ww, &wh);
             float ndcX = (2.0f*(float)mx/ww)-1.0f;
+            float ndcY = 1.0f - (2.0f*(float)my/wh);
             float sliderLeft = 0.15f - 0.30f;
             float sliderRight = 0.15f + 0.30f;
-            g_MasterVolume = (ndcX - sliderLeft) / (sliderRight - sliderLeft);
-            g_MasterVolume = std::max(0.0f, std::min(1.0f, g_MasterVolume));
+            float newVal = (ndcX - sliderLeft) / (sliderRight - sliderLeft);
+            newVal = std::max(0.0f, std::min(1.0f, newVal));
+            
+            if (ndcY > 0.50f) { // Music slider
+                g_MusicVolume = newVal;
+                if (g_audioInitialized) ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
+            } else { // Ambient slider
+                g_AmbientVolume = newVal;
+                if (g_audioInitialized) ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
+            }
         }
         // Setas de textura
         if (g_HoverGramaL) g_TexturaPistaGrama = (g_TexturaPistaGrama + 2) % 3;
@@ -2643,6 +2777,12 @@ void ProxNivel(GLFWwindow* window) {
         // Voltou pro menu após completar todos os níveis
         g_CurrentState = MENU_MAIN;
         g_nivelAtual = 1;
+        if (g_audioInitialized) {
+            ma_sound_stop(&g_ambientSound);
+            ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
+            ma_sound_start(&g_musicMenu);
+            ma_sound_set_fade_in_milliseconds(&g_musicMenu, 0.0f, 1.0f, 2000);
+        }
     }
 
     g_BolaNoBuraco = false;
@@ -2720,10 +2860,19 @@ static void ApplyTrackCollision(glm::vec3& pos, glm::vec3& vel,
                                 float min_z, float max_z)
 {
     const float B = BALL_RADIUS;
-    if (pos.x > max_x - B) { pos.x = max_x - B; vel.x *= -0.5f; }
-    if (pos.x < min_x + B) { pos.x = min_x + B; vel.x *= -0.5f; }
-    if (pos.z > max_z - B) { pos.z = max_z - B; vel.z *= -0.5f; }
-    if (pos.z < min_z + B) { pos.z = min_z + B; vel.z *= -0.5f; }
+    bool hit = false;
+    float impact_vel = 0.0f;
+    
+    if (pos.x > max_x - B) { pos.x = max_x - B; impact_vel = std::max(impact_vel, std::abs(vel.x)); vel.x *= -0.5f; hit = true; }
+    if (pos.x < min_x + B) { pos.x = min_x + B; impact_vel = std::max(impact_vel, std::abs(vel.x)); vel.x *= -0.5f; hit = true; }
+    if (pos.z > max_z - B) { pos.z = max_z - B; impact_vel = std::max(impact_vel, std::abs(vel.z)); vel.z *= -0.5f; hit = true; }
+    if (pos.z < min_z + B) { pos.z = min_z + B; impact_vel = std::max(impact_vel, std::abs(vel.z)); vel.z *= -0.5f; hit = true; }
+    
+    if (hit && g_audioInitialized && impact_vel > 0.5f) {
+        ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+        ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+        ma_sound_start(&g_wallSound);
+    }
 }
 
 
@@ -2851,6 +3000,11 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                     float vel_into_wall = glm::dot(vel, wall_normal);
                     if (vel_into_wall > 0.0f) {
                         vel -= wall_normal * vel_into_wall * 1.5f;
+                        if (g_audioInitialized && vel_into_wall > 0.5f) {
+                            ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                            ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                            ma_sound_start(&g_wallSound);
+                        }
                     }
                 }
                 
@@ -2883,16 +3037,27 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
             // Planar physics fallback with dynamic edge bounding.
             float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
             if (checkY < -1e8f) {
-                // Isolate orthogonal reflection responses to permit continuous boundary sliding.
-                float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
-                float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
-                if (checkY_X < -1e8f) vel.x *= -0.5f;
-                if (checkY_Z < -1e8f) vel.z *= -0.5f;
-                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
-                    vel.x *= -0.5f;
-                    vel.z *= -0.5f;
+                float currentY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, -1e9f);
+                if (currentY < -1e8f) {
+                    next_pos = pos + vel * sub;
+                } else {
+                    float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
+                    float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
+                    bool hitWall = false;
+                    if (checkY_X < -1e8f) { vel.x *= -0.5f; hitWall = true; }
+                    if (checkY_Z < -1e8f) { vel.z *= -0.5f; hitWall = true; }
+                    if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
+                        vel.x *= -0.5f;
+                        vel.z *= -0.5f;
+                        hitWall = true;
+                    }
+                    if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
+                        ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                        ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                        ma_sound_start(&g_wallSound);
+                    }
+                    next_pos = pos + vel * sub;
                 }
-                next_pos = pos;
             }
 
             pos = next_pos;
@@ -3025,6 +3190,11 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                             float flat_vel_normal = glm::dot(vel, flat_n);
                             if (flat_vel_normal < 0.0f) {
                                 vel -= flat_n * flat_vel_normal * 1.5f; 
+                                if (g_audioInitialized && -flat_vel_normal > 0.5f) {
+                                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                                    ma_sound_start(&g_wallSound);
+                                }
                             }
                         }
                         float dist_to_plane = glm::dot(glm::vec3(next_pos.x - best_p.x, 0.0f, next_pos.z - best_p.z), flat_n);
@@ -3090,6 +3260,11 @@ void AtualizarFisicaBola(float delta_time) {
         if (g_PosBola.y <= bottom_y + BALL_RADIUS) {
             g_PosBola.y = bottom_y + BALL_RADIUS;
             g_VelocidadeBola = glm::vec3(0.0f);
+            if (!g_BolaNoBuraco && g_audioInitialized) {
+                ma_sound_set_volume(&g_victorySound, g_AmbientVolume);
+                ma_sound_seek_to_pcm_frame(&g_victorySound, 0);
+                ma_sound_start(&g_victorySound);
+            }
             g_BolaNoBuraco = true;
             ClearTrail();
         }
@@ -3128,6 +3303,11 @@ void AtualizarFisicaBolaTwo(float delta_time) {
         if (g_PosBolaTwo.y <= bottom_y + BALL_RADIUS) {
             g_PosBolaTwo.y = bottom_y + BALL_RADIUS;
             g_VelocidadeBolaTwo = glm::vec3(0.0f);
+            if (!g_BolaNoBuracoTwo && g_audioInitialized) {
+                ma_sound_set_volume(&g_victorySound, g_AmbientVolume);
+                ma_sound_seek_to_pcm_frame(&g_victorySound, 0);
+                ma_sound_start(&g_victorySound);
+            }
             g_BolaNoBuracoTwo = true;
             ClearTrail2();
         }
