@@ -279,10 +279,11 @@ int main(int argc, char* argv[])
                             attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+2]*scale);
                         // Guardar todos os triângulos para física 3D
                         g_PistaCurvaAllTriangles.push_back({v0, v1, v2});
-                        // Filtrar: apenas triângulos com normal apontando pra cima
+                        // Filtrar: apenas triângulos com normal apontando pra cima e que não sejam borda
+                        bool isBorda = (shape.name.find("borda") != std::string::npos);
                         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
                         float len = glm::length(normal);
-                        if (len > 1e-7f && (normal.y / len) > 0.3f) {
+                        if (!isBorda && len > 1e-7f && (normal.y / len) > 0.3f) {
                             g_PistaCurvaTriangles.push_back({v0, v1, v2});
                         }
                     }
@@ -2962,7 +2963,7 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                                 bool& no_caminho, int& indice, float& progresso,
                                 glm::mat4& rot_matrix, float dt)
 {
-    const int N = std::max(1, (int)(dt / 0.004f));
+    const int N = std::max(1, (int)(dt / 0.001f));
     float sub = dt / N;
 
     for (int i = 0; i < N; i++) {
@@ -3049,26 +3050,22 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
             // Planar physics fallback with dynamic edge bounding.
             float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
             if (checkY < -1e8f) {
-                float currentY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, -1e9f);
-                if (currentY < -1e8f) {
-                    next_pos = pos + vel * sub;
-                } else {
-                    float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
-                    float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
-                    bool hitWall = false;
-                    if (checkY_X < -1e8f) { vel.x *= -0.5f; hitWall = true; }
-                    if (checkY_Z < -1e8f) { vel.z *= -0.5f; hitWall = true; }
-                    if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
-                        vel.x *= -0.5f;
-                        vel.z *= -0.5f;
-                        hitWall = true;
-                    }
-                    if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
-                        ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                        ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                        ma_sound_start(&g_wallSound);
-                    }
-                    next_pos = pos + vel * sub;
+                float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
+                float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
+                bool hitWall = false;
+                if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
+                if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
+                    next_pos.x = pos.x;
+                    next_pos.z = pos.z;
+                    vel.x *= -0.5f;
+                    vel.z *= -0.5f;
+                    hitWall = true;
+                }
+                if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
+                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                    ma_sound_start(&g_wallSound);
                 }
             }
 
@@ -3100,7 +3097,7 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
 static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
                                    glm::mat4& rot_matrix, float dt, int nivel)
 {
-    const int N = std::max(1, (int)(dt / 0.004f));
+    const int N = std::max(1, (int)(dt / 0.001f));
     float sub = dt / N;
     for (int i = 0; i < N; i++) {
         pos += vel * sub;
@@ -3121,129 +3118,59 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                                    const std::vector<TrackTriangle>& allTriangles,
                                    const std::vector<TrackTriangle>& floorTriangles)
 {
-    const int N = std::max(1, (int)(dt / 0.004f));
+    const int N = std::max(1, (int)(dt / 0.001f));
     float sub = dt / N;
 
     for (int i = 0; i < N; i++) {
         vel.y -= GRAVITY * sub;
-        
         glm::vec3 next_pos = pos + vel * sub;
+        
+        // Planar boundary containment (Invisible Walls)
+        float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
 
-        if (!allTriangles.empty()) {
-            glm::vec3 best_p = next_pos;
-            glm::vec3 best_n = glm::vec3(0.0f, 1.0f, 0.0f);
-            float min_dist2 = 1e9f;
+        if (checkY < -1e8f) {
+            float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y, pos.z, -1e9f);
+            float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y, next_pos.z, -1e9f);
 
-            for (const auto& tri : allTriangles) {
-                float min_z = std::min({tri.v0.z, tri.v1.z, tri.v2.z});
-                float max_z = std::max({tri.v0.z, tri.v1.z, tri.v2.z});
-                if (next_pos.z < min_z - 0.5f || next_pos.z > max_z + 0.5f) continue;
-                
-                float min_x = std::min({tri.v0.x, tri.v1.x, tri.v2.x});
-                float max_x = std::max({tri.v0.x, tri.v1.x, tri.v2.x});
-                if (next_pos.x < min_x - 0.5f || next_pos.x > max_x + 0.5f) continue;
-
-                glm::vec3 ab = tri.v1 - tri.v0;
-                glm::vec3 ac = tri.v2 - tri.v0;
-                glm::vec3 face_normal = glm::cross(ab, ac);
-                float face_len = glm::length(face_normal);
-                if (face_len < 1e-6f) continue; 
-                face_normal /= face_len;
-                
-                // Superfícies inclinadas mais de ~45 graus são paredes
-                bool isWall = (std::abs(face_normal.y) < 0.7f);
-                
-                glm::vec3 test_pos = next_pos;
-                bool extruded = false;
-                if (isWall) {
-                    float wall_y = (tri.v0.y + tri.v1.y + tri.v2.y) / 3.0f;
-                    test_pos.y = wall_y; 
-                    extruded = true;
-                }
-
-                glm::vec3 dummy_n;
-                glm::vec3 cp = ClosestPointOnTriangle(test_pos, tri.v0, tri.v1, tri.v2, dummy_n);
-                glm::vec3 diff = test_pos - cp;
-                float diff_len = glm::length(diff);
-                
-                // Se a parede foi extrudada, verificamos se a bola está DENTRO da largura física da parede
-                if (extruded && diff_len > 1e-4f) {
-                    float alignment = std::abs(glm::dot(diff / diff_len, face_normal));
-                    // Se alignment < 0.95, a bola passou da quina lateral da parede!
-                    if (alignment < 0.95f) {
-                        // Desfaz a extrusão para não criar paredes invisíveis infinitas para os lados
-                        test_pos = next_pos;
-                        cp = ClosestPointOnTriangle(test_pos, tri.v0, tri.v1, tri.v2, dummy_n);
-                        diff = test_pos - cp;
-                        diff_len = glm::length(diff);
-                    }
-                }
-                
-                float dist2 = diff_len * diff_len;
-                
-                if (dist2 < min_dist2 && dist2 < 0.25f) {
-                    min_dist2 = dist2;
-                    best_p = cp;
-                    best_n = face_normal;
-                }
+            bool hitWall = false;
+            if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
+            if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+            if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
+                next_pos.x = pos.x;
+                next_pos.z = pos.z;
+                vel.x *= -0.5f;
+                vel.z *= -0.5f;
+                hitWall = true;
             }
 
-            if (min_dist2 < 0.25f) {
-                float vel_normal = glm::dot(vel, best_n);
-                bool isSideWall = (std::abs(best_n.y) < 0.7f);
-
-                if (isSideWall) {
-                    glm::vec2 n2(best_n.x, best_n.z);
-                    float n2_len = glm::length(n2);
-                    if (n2_len > 1e-4f) { // Previne NaN
-                        glm::vec3 flat_n = glm::vec3(best_n.x / n2_len, 0.0f, best_n.z / n2_len);
-                        
-                        if (vel_normal < 0.0f) {
-                            float flat_vel_normal = glm::dot(vel, flat_n);
-                            if (flat_vel_normal < 0.0f) {
-                                vel -= flat_n * flat_vel_normal * 1.5f; 
-                                if (g_audioInitialized && -flat_vel_normal > 0.5f) {
-                                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                                    ma_sound_start(&g_wallSound);
-                                }
-                            }
-                        }
-                        float dist_to_plane = glm::dot(glm::vec3(next_pos.x - best_p.x, 0.0f, next_pos.z - best_p.z), flat_n);
-                        if (dist_to_plane < BALL_RADIUS) {
-                            pos.x = next_pos.x + flat_n.x * (BALL_RADIUS - dist_to_plane);
-                            pos.z = next_pos.z + flat_n.z * (BALL_RADIUS - dist_to_plane);
-                            pos.y = next_pos.y; // IMPORTANTE: Preserva o voo vertical da bola!
-                        } else {
-                            pos = next_pos; 
-                        }
-                    } else {
-                        pos = next_pos;
-                    }
-                } else {
-                    pos = best_p + best_n * BALL_RADIUS;
-                    if (vel_normal < 0.0f) {
-                        vel -= best_n * vel_normal; 
-                    }
-                }
-                
-                vel -= vel * 0.2f * sub;
-            } else {
-                pos = next_pos;
-            }
-            
-            // Garantia de Colisão com o Chão (Floor Raycast)
-            // Impede que caia no infinito caso a física falhe por alta velocidade
-            float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
-            if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
-                pos.y = sY + BALL_RADIUS;
-                if (vel.y < 0.0f) vel.y = 0.0f;
+            if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
+                ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                ma_sound_start(&g_wallSound);
             }
         }
-        
+
+        pos = next_pos;
+
+        // Perfect floor following
+        float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
+        if (sY > -1e8f) {
+            if (pos.y <= sY + BALL_RADIUS) {
+                pos.y = sY + BALL_RADIUS;
+                if (vel.y < 0.0f) {
+                    vel.y = 0.0f;
+                }
+            }
+        }
+
+        // Apply continuous floor friction
+        vel.x -= vel.x * 0.8f * sub;
+        vel.z -= vel.z * 0.8f * sub;
+
         if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
     }
     
+    // Rotação visual
     float d = glm::length(vel * dt);
     if (d > 1e-4f) {
         glm::vec4 ax(vel.z, 0, -vel.x, 0);
@@ -3366,6 +3293,7 @@ static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
 
         glm::vec3 e1 = tri.v1 - tri.v0;
         glm::vec3 e2 = tri.v2 - tri.v0;
+        
         glm::vec3 h = glm::cross(dir, e2);
         float a = glm::dot(e1, h);
         if (fabs(a) < 1e-7f) continue; // Paralelo
