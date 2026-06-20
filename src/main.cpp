@@ -214,6 +214,10 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
     LoadTextureImage("../../data/rocky_terrain_02_diff_1k.jpg"); // TextureImage1
     LoadTextureImage("../../data/golf_fbx_golf_club_BaseColor.png"); // TextureImage2
+    LoadTextureImage("../../data/t7.jpg");        // TextureImage3
+    LoadTextureImage("../../data/tronco.jpg");    // TextureImage4
+    LoadTextureImage("../../data/grass.jpg");     // TextureImage5
+    LoadTextureImage("../../data/track.jpg");     // TextureImage6
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -321,10 +325,11 @@ int main(int argc, char* argv[])
                         // Filtrar: apenas triângulos com normal apontando pra cima
                         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
                         float len = glm::length(normal);
-                        if (len > 1e-7f) {
-                            g_PistaLoopAllTriangles.push_back({v0, v1, v2}); // Guarda teto, paredes e chão
+                        bool isBorda = (shape.name.find("borda") != std::string::npos);
+                        if (!isBorda && len > 1e-7f) {
+                            g_PistaLoopAllTriangles.push_back({v0, v1, v2}); // Guarda apenas chão do loop
                             if ((normal.y / len) > 0.3f) {
-                                g_PistaLoopTriangles.push_back({v0, v1, v2}); // Guarda apenas chão para física comum
+                                g_PistaLoopTriangles.push_back({v0, v1, v2}); // Guarda apenas chão para física planar
                             }
                         }
                     }
@@ -530,7 +535,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f; // Posição do "far plane"
+        float farplane  = -50.0f; // Posição do "far plane"
 
                 if (g_UsePerspectiveProjection)
         {
@@ -739,53 +744,92 @@ int main(int argc, char* argv[])
 
         // Desenha a pista curva (nível 2)
         if(g_nivelAtual == 2){
-            glDisable(GL_CULL_FACE);
+            glEnable(GL_CULL_FACE);
             // PistaCurva: bbox_min.y = -0.2556. At scale 0.25, Y offset = 0.2556 * 0.25 = 0.064
             // para que o ponto mais baixo da mesh fique em Y=0 (nível do chão)
             model = Matrix_Translate(0.0f, 0.064f, 0.0f) * Matrix_Scale(0.25f, 0.25f, 0.25f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTACURVA);
             DrawVirtualObject("PistaCurva");
-            glEnable(GL_CULL_FACE);
 
             model = Matrix_Translate(0.0f, 0.064f, 0.0f) * Matrix_Scale(0.25f, 0.25f, 0.25f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BORDASCURVA);
             DrawVirtualObject("PistaCurva_bordas");
-            glEnable(GL_CULL_FACE);
         }
 
         // Desenha a Pista em loop (nível 3)
         if(g_nivelAtual == 3){
-            glDisable(GL_CULL_FACE);
+            glEnable(GL_CULL_FACE);
             // PistaLoop: bbox_min.y = -1.12. At scale 1.0, Y offset = 1.12
             // para que o chão da pista fique em Y=0
             model = Matrix_Translate(0.0f, 1.12f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTALOOP);
             DrawVirtualObject("loop");
-            glEnable(GL_CULL_FACE);
 
             model = Matrix_Translate(0.0f, 1.12f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BORDASLOOP);
             DrawVirtualObject("bordas_loop");
-            glEnable(GL_CULL_FACE);
         }
 
-        // (Vegetação removida — será reposicionada posteriormente)
+        // Cenário: Árvores
+        auto DrawTree = [&](float x, float y, float z, float scale, bool isTall) {
+            glm::mat4 m = Matrix_Translate(x, y, z) * Matrix_Scale(scale, scale, scale);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(m));
+            if (isTall) {
+                glUniform1i(g_object_id_uniform, ARVORE_ALTA);
+                DrawVirtualObject("Arvore-Alta");
+                glUniform1i(g_object_id_uniform, TRONCO);
+                DrawVirtualObject("Tronco_Alto.001");
+            } else {
+                glUniform1i(g_object_id_uniform, ARVORE_BAIXA);
+                DrawVirtualObject("Arvore-Baixa");
+                glUniform1i(g_object_id_uniform, TRONCO);
+                DrawVirtualObject("Cube.001");
+            }
+        };
 
+        if (g_nivelAtual >= 1 && g_nivelAtual <= 3) {
+            // Floresta densa mais proxima da pista
+            float cx = (g_PosBola.x + g_HolePosition.x) / 2.0f;
+            float cz = (g_PosBola.z + g_HolePosition.z) / 2.0f;
+            for (int i = 0; i < 60; i++) {
+                float angle = (i / 60.0f) * 2.0f * M_PI;
+                // Raio variavel adaptado pro tamanho da fase
+                float radius = 10.0f + (i % 5) * 1.5f; 
+                float tx = cx + cos(angle) * radius;
+                float tz = cz + sin(angle) * radius; 
+                
+                bool tall = (i % 2 == 0);
+                float scale = tall ? 0.15f + (i % 4)*0.03f : 0.1f + (i % 3)*0.02f;
+                DrawTree(tx, 0.0f, tz, scale, tall);
+            }
+            
+            // Segunda camada de árvores para dar mais volume visual
+            for (int i = 0; i < 40; i++) {
+                float angle = (i / 40.0f) * 2.0f * M_PI + 0.1f;
+                float radius = 16.0f + (i % 4) * 2.0f; 
+                float tx = cx + cos(angle) * radius;
+                float tz = cz + sin(angle) * radius;
+                
+                bool tall = (i % 3 != 0);
+                float scale = tall ? 0.18f + (i % 3)*0.02f : 0.12f + (i % 2)*0.02f;
+                DrawTree(tx, 0.0f, tz, scale, tall);
+            }
+        }
 
         // Desenha a Bandeira (acompanha a posição do buraco)
-        model = Matrix_Translate(g_HolePosition.x + 0.3f, 0.0f, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
+        model = Matrix_Translate(g_HolePosition.x + 0.3f, g_HolePosition.y, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, MASTRO);
         DrawVirtualObject("Bandeira_Mastro"); 
-
-        model = Matrix_Translate(g_HolePosition.x + 0.3f, 1.2f, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        
+        glDisable(GL_CULL_FACE); // A bandeira é um plano 2D, queremos vê-la dos dois lados
         glUniform1i(g_object_id_uniform, BANDEIRA);
         DrawVirtualObject("Blandeira"); 
+        glEnable(GL_CULL_FACE); 
 
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
@@ -997,7 +1041,11 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); //taco 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7); 
     glUseProgram(0);
 }
 
@@ -1635,9 +1683,9 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         g_CameraTheta -= 0.01f*dx;
         g_CameraPhi   += 0.01f*dy;
     
-        // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
+        // Em coordenadas esféricas, o ângulo phi deve ficar entre um valor mínimo acima do chão e +pi/2.
         float phimax = M_PI/2;
-        float phimin = -phimax;
+        float phimin = 0.1f;
     
         if (g_CameraPhi > phimax)
             g_CameraPhi = phimax;
@@ -2230,6 +2278,11 @@ void MenuInit()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     g_LogoTextureID = LoadTextureImageRGBA("../../GOLFinho-removebg-preview.png", &g_LogoWidth, &g_LogoHeight);
+    
+    // Bind to unit 7 for the flag shader
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, g_LogoTextureID);
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void DrawHudQuad(float cx, float cy, float hw, float hh)
@@ -2389,7 +2442,7 @@ void MenuRenderLevelSelect(GLFWwindow* window)
 
 void MenuRenderSettings(GLFWwindow* window)
 {
-    const char* gramaOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Verde Solido"};
+    const char* gramaOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Textura Realista", "Verde Solido"};
     const char* paredeOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Cinza Solido"};
     const char* bolaOpcoes[] = {"Branca", "Tijolo", "Rochosa"};
     const char* tacoOpcoes[] = {"Metal Cinza", "Texturizado", "Tijolo"};
@@ -2638,10 +2691,15 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
     glEnable(GL_CULL_FACE);
 
     // Bandeira
-    model = Matrix_Translate(hp.x+0.35f, hp.y+0.8f, hp.z) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.15f, 1.0f, 0.1f);
+    model = Matrix_Translate(hp.x + 0.3f, hp.y, hp.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(g_object_id_uniform, MASTRO);
+    DrawVirtualObject("Bandeira_Mastro"); 
+    
+    glDisable(GL_CULL_FACE);
     glUniform1i(g_object_id_uniform, BANDEIRA);
-    DrawVirtualObject("the_plane");
+    DrawVirtualObject("Blandeira");
+    glEnable(GL_CULL_FACE);
 
     // Bola estática para visualização
     model = Matrix_Translate(0.0f, 0.025f, -3.0f) * Matrix_Scale(0.025f, 0.025f, 0.025f);
@@ -2771,8 +2829,8 @@ void MenuHandleClick(GLFWwindow* window)
             }
         }
         // Setas de textura
-        if (g_HoverGramaL) g_TexturaPistaGrama = (g_TexturaPistaGrama + 2) % 3;
-        if (g_HoverGramaR) g_TexturaPistaGrama = (g_TexturaPistaGrama + 1) % 3;
+        if (g_HoverGramaL) g_TexturaPistaGrama = (g_TexturaPistaGrama + 3) % 4;
+        if (g_HoverGramaR) g_TexturaPistaGrama = (g_TexturaPistaGrama + 1) % 4;
         if (g_HoverParedeL) g_TexturaPistaParede = (g_TexturaPistaParede + 2) % 3;
         if (g_HoverParedeR) g_TexturaPistaParede = (g_TexturaPistaParede + 1) % 3;
         if (g_HoverBolaL) g_TexturaBola = (g_TexturaBola + 2) % 3;

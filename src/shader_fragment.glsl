@@ -39,6 +39,7 @@ uniform mat4 projection;
 #define PISTA_PAREDE 14
 #define ARVORE_ALTA 15
 #define ARVORE_BAIXA 16
+#define TRONCO 23
 #define CACTUS 17
 #define PISTACURVA 18
 #define PISTASIMPLES 19
@@ -65,6 +66,11 @@ uniform vec4 bbox_max;
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
+uniform sampler2D TextureImage3; // Folhas (t7.jpg)
+uniform sampler2D TextureImage4; // Tronco (tronco.jpg)
+uniform sampler2D TextureImage5; // Grama (grass.jpg)
+uniform sampler2D TextureImage6; // Track (track.jpg)
+uniform sampler2D TextureImage7; // Logo (GOLFinho)
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -219,15 +225,31 @@ void main()
     }
     else if ( object_id == BANDEIRA )
     {
-        Kd0 = vec3(1.0, 0.2, 0.2); // bandeira vermelha
-        Ks = vec3(0.0, 0.0, 0.0);
-        q = 1.0;
+        // Rotaciona a textura em 90 graus e inverte U para desespelhar a logo
+        U = 1.0 - texcoords.y;
+        V = 1.0 - texcoords.x;
+        
+        // Dá um pequeno zoom na logo para ela preencher melhor a bandeira
+        U = (U - 0.5) * 0.85 + 0.5;
+        V = (V - 0.5) * 0.85 + 0.5;
+
+        if (U >= 0.0 && U <= 1.0 && V >= 0.0 && V <= 1.0) {
+            vec4 logo = texture(TextureImage7, vec2(U,V));
+            // Interpola suavemente as bordas usando o Alpha, fica muito mais nítido de longe
+            Kd0 = mix(vec3(0.02, 0.02, 0.02), logo.rgb, logo.a);
+        } else {
+            Kd0 = vec3(0.02, 0.02, 0.02); // Fundo preto puro para a bandeira
+        }
+        Ks = vec3(0.2, 0.2, 0.2); // Leve brilho
+        q = 10.0;
     }
     else if ( object_id == GRAMA )
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.5) discard;
-        Kd0 = vec3(0.1, 0.6, 0.1); // grama viva
+        U = position_world.x * 0.5;
+        V = position_world.z * 0.5;
+        Kd0 = texture(TextureImage5, vec2(U,V)).rgb; // grama baixada
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
@@ -235,12 +257,15 @@ void main()
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
-        U = texcoords.x;
-        V = texcoords.y;
+        vec4 world_pos = model * position_model;
+        U = world_pos.x * 2.0;
+        V = world_pos.z * 2.0;
         if (u_TexturaGramaPista == 0)
             Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // terreno rochoso (padrao)
         else if (u_TexturaGramaPista == 1)
             Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo vermelho
+        else if (u_TexturaGramaPista == 2)
+            Kd0 = texture(TextureImage6, vec2(U,V)).rgb; // track.jpg
         else
             Kd0 = vec3(0.2, 0.7, 0.2); // verde solido
     }
@@ -273,6 +298,8 @@ void main()
                 Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
             else if (u_TexturaGramaPista == 1)
                 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+            else if (u_TexturaGramaPista == 2)
+                Kd0 = texture(TextureImage6, vec2(U,V)).rgb;
             else
                 Kd0 = vec3(0.2, 0.7, 0.2);
         } else {
@@ -295,7 +322,21 @@ void main()
     }
     else if ( object_id == ARVORE_ALTA || object_id == ARVORE_BAIXA )
     {
-        Kd0 = vec3(0.15, 0.5, 0.12); // verde escuro de folhagem
+        vec4 world_pos = model * position_model;
+        U = world_pos.x * 0.5;
+        V = world_pos.y * 0.5;
+        vec3 texture_color = texture(TextureImage3, vec2(U,V)).rgb;
+        Kd0 = texture_color;
+        Ks = vec3(0.0, 0.0, 0.0);
+        q = 1.0;
+    }
+    else if ( object_id == TRONCO )
+    {
+        vec4 world_pos = model * position_model;
+        U = world_pos.x * 0.5;
+        V = world_pos.y * 0.5;
+        vec3 texture_color = texture(TextureImage4, vec2(U,V)).rgb;
+        Kd0 = texture_color;
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
