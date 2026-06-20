@@ -1227,23 +1227,33 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
 //segundo um cara no stackoverflow "matrizes 4x4 são as únicas capazes de combinar translação, rotação e escala em uma única estrutura matemática"
 glm::mat4 CalcularTaco(glm::vec3 posicao_bola, glm::vec3 direcao_taco, float distancia)
 {
-    //calcula a posição do taco 
-    float cosseno = cos(g_TacoRotacao);
-    float seno = sin(g_TacoRotacao);
+    // 1. Escala original do taco
+    glm::mat4 m_scale = Matrix_Scale(0.05f, 0.05f, 0.05f);
     
-    // posição atrás da bola
-    glm::vec3 posicao_taco = posicao_bola + glm::vec3(
-        cosseno * distancia,  // X
-        0.05f,                // Y levemente levantado
-        seno * distancia      // Z 
-    );
+    // 2. Gira 90 graus POSITIVO para alinhar a face plana do taco para frente (direção do impacto, eixo -X)
+    glm::mat4 m_rot_y_mesh = Matrix_Rotate_Y(M_PI / 2.0f);
     
-    glm::mat4 modelo = Matrix_Translate(posicao_taco.x, posicao_taco.y, posicao_taco.z)
-                     * Matrix_Rotate_Y(g_TacoRotacao)  // rotação do taco ao redor da bola
-                     * Matrix_Rotate_Z(g_TacoRotacaoVertical) // swing (rotação como pêndulo)
-                     * Matrix_Translate(0.0f, -0.05f, 0.0f) // ajusta o pivô da rotação (depende da malha do taco)
-                     * Matrix_Rotate_Y(-M_PI / 2.0f) // Gira 90 graus para bater com a lateral da cabeça do taco
-                     * Matrix_Scale(0.05f, 0.05f, 0.05f); //ESCALA DO TACO
+    // 3. Ajuste fino do impacto. O raio da bola é 0.025. Queremos que a face do taco toque exatamente em X=+0.025.
+    glm::mat4 m_ajuste_impacto = Matrix_Translate(0.017f, -0.01f, -0.046f);
+    
+    // 4. Pivô do Pêndulo. O jogador segura o taco no Grip (altura Y=0.34).
+    glm::mat4 m_pivot = Matrix_Translate(-0.017f, -0.34f, +0.046f); 
+    
+    // 5. Swing (Pêndulo no eixo Z local).
+    // Ângulo POSITIVO rotaciona a cabeça do taco para +X (puxando para TRÁS, para a câmera).
+    glm::mat4 m_swing = Matrix_Rotate_Z(g_TacoRotacaoVertical);
+    
+    // 6. Retorna o grip para a posição exata de stance.
+    glm::mat4 m_unpivot = Matrix_Translate(0.017f, 0.34f, -0.046f);
+    
+    // 7. Rotação do jogador (Mira). Gira toda a mecânica ao redor do centro da bola (eixo Y).
+    // O SINAL DEVE SER NEGATIVO (-g_TacoRotacao) PARA ACOMPANHAR A CÂMERA DO JOGADOR!
+    glm::mat4 m_mira = Matrix_Rotate_Y(-g_TacoRotacao);
+    
+    // 8. Coloca na posição final do mundo
+    glm::mat4 m_pos = Matrix_Translate(posicao_bola.x, posicao_bola.y, posicao_bola.z);
+    
+    glm::mat4 modelo = m_pos * m_mira * m_unpivot * m_swing * m_pivot * m_ajuste_impacto * m_rot_y_mesh * m_scale;
     
     return modelo;
 }
@@ -1251,53 +1261,59 @@ glm::mat4 CalcularTaco(glm::vec3 posicao_bola, glm::vec3 direcao_taco, float dis
 // Função que atualiza a animação do taco
 void RotacionarTaco(GLFWwindow* window)
 {
+    static bool bola_atingida = false;
+
     if (g_TempoRotacaoTaco < 0.0) 
     {
-        // está parado
-        g_TacoRotacaoVertical = 0.0f;
+        bola_atingida = false; 
+        if (g_EspacoPressionado) {
+            float percent = std::min(g_ForcaTacada / 15.0f, 1.0f);
+            g_TacoRotacaoVertical = percent * g_AnguloRotacaoTaco; // Puxa pra trás
+        } else {
+            g_TacoRotacaoVertical = 0.0f; // Fica travado na bola
+        }
         return;
     }
     
     double Atual = glfwGetTime();
     double Total = Atual - g_TempoRotacaoTaco;
     
-    // se a animação terminou voltar ao repouso
-    if (Total >= g_DuracaoRotacaoTaco)
+    float duracao_descida = 0.15f; 
+    
+    float percent_forca = std::min(g_ForcaTacada / 15.0f, 1.0f);
+    float angulo_inicial = percent_forca * g_AnguloRotacaoTaco; 
+
+    // Termina a tacada logo após o impacto para garantir que ele pare encostado!
+    if (Total >= duracao_descida + 0.1f) 
     {
         g_TacoRotacaoVertical = 0.0f;
-        g_TempoRotacaoTaco = -1.0; // reseta o tempo
-
-        // Tacada: dar velocidade à bola na direção em que o taco está apontado
-        if (!g_BolaNoBuraco) {
-            float forca = std::max(2.0f, g_ForcaTacada); // Garante que até um toquinho mova a bola
-            float cosseno = cos(g_TacoRotacao);
-            float seno = sin(g_TacoRotacao);
-            // a direção do taco é rotacionada no eixo Y.
-            // Quando a rotação é 0, ele deve empurrar para frente (Z positivo ou negativo dependendo do eixo).
-            // Em CalcularTaco, a posição usa: Z += seno*dist, X += cosseno*dist
-            // Portanto a bola deve ir na direção oposta ao deslocamento.
-            if(!g_JogadorAtual){
-                g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
-                g_BolaEmFocoAtual = false; // Câmera seguirá a bola 1
-            } else if(g_JogadorAtual){
-                g_VelocidadeBolaTwo = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
-                g_BolaEmFocoAtual = true; // Câmera seguirá a bola 2
-            }
-        }
+        g_TempoRotacaoTaco = -1.0; 
         return;
     }
     
-    // Calcular a progressão do swing 0 - 1
-    float t = (float)(Total / g_DuracaoRotacaoTaco);
-    
-    // Animação de pêndulo simples (sobe e bate)
-    // t de 0 a 0.5: puxa o taco para trás. t de 0.5 a 1.0: desce batendo
-    if (t < 0.5f) {
-        float progress = t * 2.0f; // 0 a 1
-        g_TacoRotacaoVertical = g_AnguloRotacaoTaco * sin(progress * (M_PI / 2.0f));
+    if (Total <= duracao_descida) {
+        // Fase 1: Descida (Aceleração Quadrática até bater no 0)
+        float t = (float)(Total / duracao_descida); 
+        g_TacoRotacaoVertical = angulo_inicial * (1.0f - (t * t));
     } else {
-        float progress = (t - 0.5f) * 2.0f; // 0 a 1
-        g_TacoRotacaoVertical = g_AnguloRotacaoTaco * cos(progress * (M_PI / 2.0f));
+        // Fase 2: Impacto Físico
+        if (!bola_atingida && !g_BolaNoBuraco) {
+            bola_atingida = true;
+            float forca = std::max(2.0f, g_ForcaTacada); 
+            float cosseno = cos(g_TacoRotacao);
+            float seno = sin(g_TacoRotacao);
+            
+            if(!g_JogadorAtual){
+                g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
+                g_BolaEmFocoAtual = false; 
+            } else {
+                g_VelocidadeBolaTwo = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
+                g_BolaEmFocoAtual = true; 
+            }
+        }
+        
+        // Mantém o taco em repouso perfeito na posição inicial (encostado onde a bola estava)
+        g_TacoRotacaoVertical = 0.0f;
     }
 }
 
