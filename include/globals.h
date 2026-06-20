@@ -125,24 +125,26 @@ struct SceneObject
 // IMPORTANTE: Devem ser mantidas em sincronia com
 // shader_fragment.glsl.
 // =============================================
-#define SPHERE       0
-#define BUNNY        1
-#define PLANE        2
-#define TACO         3
-#define BOLA         4
-#define BURACO       5
-#define TRAJETORIA   6
-#define BANDEIRA     7
-#define MASTRO       8
-#define HUD_BARRA    9
-#define GRAMA        10
-#define PISTALOOP    11
-#define PISTA_CHAO   13
+#define SPHERE 0
+#define BUNNY  1
+#define PLANE  2
+#define TACO   3
+#define BOLA   4
+#define BURACO 5
+#define TRAJETORIA 6
+#define BANDEIRA 7
+#define MASTRO 8
+#define HUD_BARRA 9
+#define GRAMA 10
+#define PISTALOOP 11
+#define PISTASIMPLES 12
+#define PISTA_CHAO 13
 #define PISTA_PAREDE 14
-#define ARVORE_ALTA  15
+#define ARVORE_ALTA 15
 #define ARVORE_BAIXA 16
-#define CACTUS       17
-#define PISTACURVA   18
+#define CACTUS 17
+#define PISTACURVA 18
+#define GIRADOR 19
 
 // =============================================
 // ENUM DE ESTADO DO JOGO
@@ -295,6 +297,7 @@ extern double g_LastCursorPosX, g_LastCursorPosY;
 
 // --- Shader de texto (definido em textrendering.cpp) ---
 extern GLuint textprogram_id;
+
 
 // --- Sistema de Trilha da Bola ---
 struct TrailSegment

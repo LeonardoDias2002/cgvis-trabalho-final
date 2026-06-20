@@ -39,11 +39,19 @@
 
 #include <stb_image.h>
 
+// Headers da biblioteca para carregar modelos FBX (Assimp) 
+// TUTORIAL DE ASSIMP (MUITO BOM): https://www.youtube.com/watch?v=GZQkwx10p-8
+// ---- Estou usando SOA ao inves de AOS que é usada pelo Gastal ----
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
 #include "trail.h"
 #include "globals.h"
+#include "fbx_loader.h"
 
 
 // Declaração de funções utilizadas para pilha de matrizes de modelagem.
@@ -110,6 +118,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+
 
 // função para avançar para o próximo nível
 void ProxNivel(GLFWwindow* window); 
@@ -225,20 +234,36 @@ int main(int argc, char* argv[])
     ComputeNormals(&bolamodel);
     BuildTrianglesAndAddToVirtualScene(&bolamodel);
 
+    // Construímos a priemira pista
+    ObjModel PistaSimplesmodel("../../data/PistaSimples.obj");
+    ComputeNormals(&PistaSimplesmodel);
+    BuildTrianglesAndAddToVirtualScene(&PistaSimplesmodel);
+
     // Construímos a Pista com loop
     ObjModel PistaLoopmodel("../../data/PistaLoop.obj");
     ComputeNormals(&PistaLoopmodel);
     BuildTrianglesAndAddToVirtualScene(&PistaLoopmodel);
 
-    // Construímos a bandeira
+    /* Construímos a bandeira
     ObjModel bandeiramodel("../../data/bandeira.obj");
     ComputeNormals(&bandeiramodel);
-    BuildTrianglesAndAddToVirtualScene(&bandeiramodel);
+    BuildTrianglesAndAddToVirtualScene(&bandeiramodel);*/
 
     // Construímos a Pista cCurva
     ObjModel PistaCurvamodel("../../data/PistaCurva.obj");
     ComputeNormals(&PistaCurvamodel);
     BuildTrianglesAndAddToVirtualScene(&PistaCurvamodel);
+
+    // Construímos a bandeira
+    MeshSOA bandeira = LoadFBX("../../data/bandeira.fbx");
+    BuildFBXAndAddToVirtualScene(bandeira, "bandeira");
+
+    printf("vertices: %zu\n", bandeira.positions.size());
+    printf("indices phoda: %zu\n", bandeira.indices.size());
+
+    /* Construímos o Girador
+    MeshSOA Girador = LoadFBX("../../data/Girador.fbx");
+    BuildFBXAndAddToVirtualScene(Girador, "Girador");*/
 
     // Extrair triângulos da PistaCurva para heightmap (world space: scale=0.25, Y offset=0.064)
     // APENAS triângulos com normal apontando pra cima (chão), excluindo paredes e teto
@@ -497,7 +522,6 @@ int main(int argc, char* argv[])
         glDisable(GL_CULL_FACE);
 
         // Chão de GRAMA (Terreno Aberto)
-        
         model = Matrix_Translate(0.0f, -0.01f, 0.0f) * Matrix_Scale(50.0f, 1.0f, 50.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GRAMA);
@@ -535,6 +559,8 @@ int main(int argc, char* argv[])
             glUniform1i(g_object_id_uniform, PISTA_PAREDE);
             DrawVirtualObject("the_plane");
         }
+
+
 
         // Reativamos o Culling para os objetos 3D normais
         glEnable(GL_CULL_FACE);
@@ -589,6 +615,18 @@ int main(int argc, char* argv[])
 
         }
         
+        // bandeira fbx
+        model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z + 1) * Matrix_Scale(1.0f, 1.0f, 2.0f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, BANDEIRA);
+        DrawVirtualObject("bandeira");
+
+        //girador fbx
+        model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z + 1) * Matrix_Scale(1.0f, 1.0f, 2.0f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GIRADOR);
+        DrawVirtualObject("Girador");
+
 
         // Buraco (posição depende do nível)
         model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z) * Matrix_Scale(0.12f, 0.001f, 0.12f);
@@ -661,16 +699,11 @@ int main(int argc, char* argv[])
         // (Vegetação removida — será reposicionada posteriormente)
 
 
-        // Desenha a Bandeira (acompanha a posição do buraco)
+        /* Desenha a Bandeira (acompanha a posição do buraco)
         model = Matrix_Translate(g_HolePosition.x + 0.3f, 0.0f, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, MASTRO);
-        DrawVirtualObject("Bandeira_Mastro"); 
-
-        model = Matrix_Translate(g_HolePosition.x + 0.3f, 1.2f, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, BANDEIRA);
-        DrawVirtualObject("Blandeira"); 
+        DrawVirtualObject("Bandeira_Mastro"); */
 
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
@@ -793,12 +826,14 @@ void LoadTextureImage(const char* filename)
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
 void DrawVirtualObject(const char* object_name)
 {
+    //
     // "Ligamos" o VAO. Informamos que queremos utilizar os atributos de
     // vértices apontados pelo VAO criado pela função BuildTrianglesAndAddToVirtualScene(). Veja
     // comentários detalhados dentro da definição de BuildTrianglesAndAddToVirtualScene().
     glBindVertexArray(g_VirtualScene[object_name].vertex_array_object_id);
 
-    // Setamos as variáveis "bbox_min" e "bbox_max" do fragment shader
+
+    // Setamos as variáveis "bbox_min" e "bbox_max" do fragment shaderr
     // com os parâmetros da axis-aligned bounding box (AABB) do modelo.
     glm::vec3 bbox_min = g_VirtualScene[object_name].bbox_min;
     glm::vec3 bbox_max = g_VirtualScene[object_name].bbox_max;
@@ -1040,7 +1075,7 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
             {
                 tinyobj::index_t idx = model->shapes[shape].mesh.indices[3*triangle + vertex];
 
-                indices.push_back(first_index + 3*triangle + vertex);
+                indices.push_back(first_index + 3*triangle + vertex); // <----
 
                 const float vx = model->attrib.vertices[3*idx.vertex_index + 0];
                 const float vy = model->attrib.vertices[3*idx.vertex_index + 1];

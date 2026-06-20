@@ -8,6 +8,7 @@
 set(SOURCES
   src/main.cpp
   src/correcao.cpp
+  src/fbx_loader.cpp
   src/textrendering.cpp
   src/tiny_obj_loader.cpp
   src/stb_image.cpp
@@ -24,6 +25,8 @@ endif()
 cmake_minimum_required(VERSION 3.10)
 
 project(LAB_FCG VERSION 1.0.0)
+
+find_package(assimp CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD          11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,7 +67,8 @@ endforeach()
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
-target_include_directories(${EXECUTABLE_NAME} BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(${EXECUTABLE_NAME} PRIVATE assimp::assimp BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
 
 if(WIN32)
 
@@ -106,7 +110,7 @@ if(WIN32)
 
   message(STATUS "LIBGLFW = ${LIBGLFW}")
 
-  target_link_libraries(${EXECUTABLE_NAME} ${LIBGLFW} gdi32 opengl32)
+  target_link_libraries(${EXECUTABLE_NAME} ${LIBGLFW} gdi32 opengl32 assimp)
 
 elseif(UNIX)
 

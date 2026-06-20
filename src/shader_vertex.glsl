@@ -6,10 +6,17 @@ layout (location = 0) in vec4 model_coefficients;
 layout (location = 1) in vec4 normal_coefficients;
 layout (location = 2) in vec2 texture_coefficients;
 
+//Mesma coisa mas para FBX Assimp
+layout(location = 4) in ivec4 boneIds;
+layout(location = 5) in vec4 weights;
+
 // Matrizes computadas no código C++ e enviadas para a GPU
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+
+//Mesma coisa mas para FBX Assimp
+uniform mat4 Bones[100];
 
 // Atributos de vértice que serão gerados como saída ("out") pelo Vertex Shader.
 // ** Estes serão interpolados pelo rasterizador! ** gerando, assim, valores

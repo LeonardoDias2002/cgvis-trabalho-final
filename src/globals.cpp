@@ -175,4 +175,3 @@ float g_TrailtempoMax = 1.5f;                               // Duração máxima
 float g_TrailThickness = 0.008f;                          // Espessura do raio (8mm)
 glm::vec3 g_LastTrailPosBola = glm::vec3(0.0f);           // Última posição registrada da trilha
 glm::vec3 g_LastTrailPosBola2 = glm::vec3(0.0f);          // Última posição registrada da trilha (bola 2)
-

@@ -34,13 +34,14 @@ uniform mat4 projection;
 #define HUD_BARRA 9
 #define GRAMA 10
 #define PISTALOOP 11
-
+#define PISTASIMPLES 12
 #define PISTA_CHAO 13
 #define PISTA_PAREDE 14
 #define ARVORE_ALTA 15
 #define ARVORE_BAIXA 16
 #define CACTUS 17
 #define PISTACURVA 18
+#define GIRADOR 19
 
 
 uniform int object_id;
