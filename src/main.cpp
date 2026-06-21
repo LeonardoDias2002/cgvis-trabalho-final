@@ -3025,30 +3025,30 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
     float sub = dt / N;
 
     for (int i = 0; i < N; i++) {
-        // Define the spatial boundary for continuous 3D mesh physics application.
-        bool inside_loop_zone = (pos.z > -2.0f && pos.z < 1.0f);
-
         vel.y -= GRAVITY * sub;
         
         glm::vec3 next_pos = pos + vel * sub;
 
-        if (inside_loop_zone && !g_PistaLoopAllTriangles.empty()) {
+        if (!g_PistaLoopAllTriangles.empty()) {
+            bool fallback_to_planar = false;
             glm::vec3 best_p = next_pos;
             glm::vec3 best_n = glm::vec3(0.0f, 1.0f, 0.0f);
             float min_dist2 = 1e9f;
 
             for (const auto& tri : g_PistaLoopAllTriangles) {
-                // Optimize intersection testing by excluding distant geometric segments.
                 float min_z = std::min({tri.v0.z, tri.v1.z, tri.v2.z});
                 float max_z = std::max({tri.v0.z, tri.v1.z, tri.v2.z});
                 if (next_pos.z < min_z - 0.5f || next_pos.z > max_z + 0.5f) continue;
 
                 glm::vec3 n;
                 glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                
+                // BACKFACE CULLING: Evita colar por baixo do chão na base do loop
+                if (pos.y < 1.0f && n.y < -0.05f) continue;
+
                 glm::vec3 diff = next_pos - cp;
                 float dist2 = glm::dot(diff, diff);
                 
-                // Restrict snapping range to prevent erroneous attachment to the outer hull shell structure.
                 if (dist2 < min_dist2 && dist2 < 0.25f) {
                     min_dist2 = dist2;
                     best_p = cp;
@@ -3057,16 +3057,12 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
             }
 
             if (min_dist2 < 0.25f) {
-                // Universal 3D Edge Detection: 
-                // Evaluates lateral deviation between the desired step vector and the closest projection.
-                // A non-zero divergence implies the kinematic path breached the valid polygon perimeter.
                 glm::vec3 diff = next_pos - best_p;
                 float normal_dist = glm::dot(diff, best_n);
                 glm::vec3 diff_tangent = diff - best_n * normal_dist;
                 float lateral = glm::length(diff_tangent);
 
                 if (lateral > 0.01f) {
-                    // Impose an elastic boundary reaction vector to contain motion within the mesh.
                     glm::vec3 wall_normal = diff_tangent / lateral;
                     float vel_into_wall = glm::dot(vel, wall_normal);
                     if (vel_into_wall > 0.0f) {
@@ -3081,7 +3077,6 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                 
                 pos = best_p + best_n * BALL_RADIUS;
 
-                // Project velocity onto the tangential plane to preserve momentum along curvature.
                 float vel_normal = glm::dot(vel, best_n);
                 if (vel_normal < 0.0f) {
                     vel -= best_n * vel_normal;
@@ -3089,60 +3084,50 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                 
                 vel -= vel * LOOP_FRICTION * sub;
                 
-                // Centripetal failure condition: Detach when tangential inertia is insufficient to counter gravity.
                 float speed = glm::length(vel);
                 if (best_n.y < 0.5f && speed < 1.5f && pos.y > 0.5f) {
                     vel.y -= GRAVITY * sub * 2.0f;
                     pos = next_pos; 
+                    fallback_to_planar = true;
                 }
             } else {
-                pos = next_pos;
-                // Planar raycast fallback for untethered entities traversing the loop zone overhead space.
-                float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, -1e9f);
-                if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
-                    pos.y = sY + BALL_RADIUS;
-                    vel.y = 0.0f;
-                }
-            }
-        } else {
-            // Planar physics fallback with dynamic edge bounding.
-            float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
-            if (checkY < -1e8f) {
-                float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y, pos.z, -1e9f);
-                float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, next_pos.z, -1e9f);
-                bool hitWall = false;
-                if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
-                if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
-                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
-                    next_pos.x = pos.x;
-                    next_pos.z = pos.z;
-                    vel.x *= -0.5f;
-                    vel.z *= -0.5f;
-                    hitWall = true;
-                }
-                if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
-                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                    ma_sound_start(&g_wallSound);
-                }
+                fallback_to_planar = true;
             }
 
-            pos = next_pos;
-            vel.x -= vel.x * 0.9f * sub; 
-            vel.z -= vel.z * 0.9f * sub;
-            if (glm::length(glm::vec3(vel.x, 0.0f, vel.z)) < 0.05f) {
-                vel.x = 0.0f; vel.z = 0.0f;
-            }
-            
-            float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y, pos.z, 0.0f);
-            if (pos.y <= sY + BALL_RADIUS) {
-                pos.y = sY + BALL_RADIUS;
-                vel.y = 0.0f;
+            if (fallback_to_planar) {
+                pos = next_pos;
+                float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
+                if (checkY < -1e8f) {
+                    float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
+                    float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
+                    bool hitWall = false;
+                    if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
+                    if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                }
+
+                vel.x -= vel.x * 0.9f * sub; 
+                vel.z -= vel.z * 0.9f * sub;
+                if (glm::length(glm::vec3(vel.x, 0.0f, vel.z)) < 0.05f) { vel.x = 0.0f; vel.z = 0.0f; }
+                
+                float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, pos.z, -1e9f);
+                if (sY < -1e8f && !g_PistaLoopTriangles.empty()) {
+                    float min_d2 = 1e9f;
+                    for (const auto& tri : g_PistaLoopTriangles) {
+                        glm::vec3 n;
+                        glm::vec3 cp = ClosestPointOnTriangle(pos, tri.v0, tri.v1, tri.v2, n);
+                        float d2 = (pos.x - cp.x)*(pos.x - cp.x) + (pos.z - cp.z)*(pos.z - cp.z);
+                        if (d2 < min_d2) { min_d2 = d2; sY = cp.y; }
+                    }
+                }
+                
+                if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
+                    pos.y = sY + BALL_RADIUS;
+                    if (vel.y < 0.0f) vel.y = 0.0f;
+                }
             }
         }
     }
     
-    // Rotação visual 
     float d = glm::length(vel * dt);
     if (d > 1e-4f) {
         glm::vec4 ax(vel.z, 0, -vel.x, 0);
@@ -3184,11 +3169,12 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
         glm::vec3 next_pos = pos + vel * sub;
         
         // Planar boundary containment (Invisible Walls)
-        float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y, next_pos.z, -1e9f);
+        // Elevado para +2.0f para ignorar problemas de tunneling
+        float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
 
         if (checkY < -1e8f) {
-            float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y, pos.z, -1e9f);
-            float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y, next_pos.z, -1e9f);
+            float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
+            float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
 
             bool hitWall = false;
             if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
@@ -3210,8 +3196,24 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
 
         pos = next_pos;
 
-        // Perfect floor following
-        float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y, pos.z, -1e9f);
+        // Perfect floor following with gap filler!
+        float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, pos.z, -1e9f);
+        
+        if (sY < -1e8f && !floorTriangles.empty()) {
+            float min_d2 = 1e9f;
+            for (const auto& tri : floorTriangles) {
+                glm::vec3 n;
+                glm::vec3 cp = ClosestPointOnTriangle(pos, tri.v0, tri.v1, tri.v2, n);
+                float dx = pos.x - cp.x;
+                float dz = pos.z - cp.z;
+                float d2 = dx*dx + dz*dz;
+                if (d2 < min_d2) {
+                    min_d2 = d2;
+                    sY = cp.y;
+                }
+            }
+        }
+
         if (sY > -1e8f) {
             if (pos.y <= sY + BALL_RADIUS) {
                 pos.y = sY + BALL_RADIUS;
@@ -3266,10 +3268,18 @@ void AtualizarFisicaBola(float delta_time) {
             ClearTrail();
         }
     } else {
-        if (g_nivelAtual == 3)
-            AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_BolaNoCaminho,
-                                g_IndiceCaminho, g_ProgressoCaminho,
-                                g_BolaRotationMatrix, delta_time);
+        if (g_nivelAtual == 3) {
+            bool inside_loop_zone = (g_PosBola.z > -2.5f && g_PosBola.z < 1.5f);
+            if (inside_loop_zone) {
+                AtualizarFisicaLoop(g_PosBola, g_VelocidadeBola, g_BolaNoCaminho,
+                                    g_IndiceCaminho, g_ProgressoCaminho,
+                                    g_BolaRotationMatrix, delta_time);
+            } else {
+                AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
+                                       g_BolaRotationMatrix, delta_time,
+                                       g_PistaLoopAllTriangles, g_PistaLoopTriangles);
+            }
+        }
         else if (g_nivelAtual == 2)
             AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
                                    g_BolaRotationMatrix, delta_time,
@@ -3309,10 +3319,22 @@ void AtualizarFisicaBolaTwo(float delta_time) {
             ClearTrail2();
         }
     } else {
-        if (g_nivelAtual == 3)
-            AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_BolaNoCaminhoTwo,
-                                g_IndiceCaminhoTwo, g_ProgressoCaminhoTwo,
-                                g_BolaRotationMatrixTwo, delta_time);
+        if (g_nivelAtual == 3) {
+            bool inside_loop_zone = (g_PosBolaTwo.z > -2.5f && g_PosBolaTwo.z < 1.5f);
+            if (inside_loop_zone) {
+                AtualizarFisicaLoop(g_PosBolaTwo, g_VelocidadeBolaTwo, g_BolaNoCaminhoTwo,
+                                    g_IndiceCaminhoTwo, g_ProgressoCaminhoTwo,
+                                    g_BolaRotationMatrixTwo, delta_time);
+            } else {
+                AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
+                                       g_BolaRotationMatrixTwo, delta_time,
+                                       g_PistaLoopAllTriangles, g_PistaLoopTriangles);
+            }
+        }
+        else if (g_nivelAtual == 2)
+            AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
+                                   g_BolaRotationMatrixTwo, delta_time,
+                                   g_PistaCurvaAllTriangles, g_PistaCurvaTriangles);
         else
             AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
                                    g_BolaRotationMatrixTwo, delta_time, g_nivelAtual);
