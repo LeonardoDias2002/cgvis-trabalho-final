@@ -900,8 +900,11 @@ int main(int argc, char* argv[])
 
         if (g_nivelAtual >= 1 && g_nivelAtual <= 3) {
             // Floresta densa mais proxima da pista
-            float cx = (g_PosBola.x + g_HolePosition.x) / 2.0f;
-            float cz = (g_PosBola.z + g_HolePosition.z) / 2.0f;
+            float cx = 0.0f;
+            float cz = 0.0f;
+            if (g_nivelAtual == 1) { cx = 0.0f; cz = 0.5f; }
+            else if (g_nivelAtual == 2) { cx = 1.365f; cz = -2.15f; }
+            else if (g_nivelAtual == 3) { cx = 2.5f; cz = 1.35f; }
             for (int i = 0; i < 60; i++) {
                 float angle = (i / 60.0f) * 2.0f * M_PI;
                 // Raio variavel adaptado pro tamanho da fase
