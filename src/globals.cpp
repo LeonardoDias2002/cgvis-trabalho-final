@@ -120,7 +120,10 @@ bool g_BolaEmFocoAtual = false; // false = câmera segue bola 1, true = câmera 
 glm::vec3 g_PosBolaTwo = glm::vec3(1.0f, 0.025f, -3.0f); //posição atual da bola de golfe do SEGUNDO jogadors
 glm::vec3 g_PosTacoTwo = glm::vec3(1.0f, 0.0f, -1.0f); // direção apontada pelo taco do SEGUNDO jogador
 glm::vec3 g_VelocidadeBolaTwo = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::mat4 g_BolaRotationMatrixTwo = glm::mat4(1.0f); // Rotação acumulativa da bola
+glm::mat4 g_BolaRotationMatrixTwo = glm::mat4(1.0f);
+
+int g_TacadasPlayer1 = 0;
+int g_TacadasPlayer2 = 0; // Rotação acumulativa da bola
 
 // ========== LOOP PHYSICS ==========
 bool g_BolaNoCaminho = false;

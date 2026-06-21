@@ -58,6 +58,8 @@ uniform int u_TexturaTaco;         // 0=metal, 1=textured, 2=brick
 uniform vec3 u_TrailColor;         // Cor da trilha (RGB)
 uniform float u_TrailOpacity;      // Opacidade da trilha (0.0 a 1.0)
 uniform vec3 u_HolePosition;       // Posicao do buraco no mundo
+uniform int u_BolaInativa;
+uniform float u_Time;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
 uniform vec4 bbox_min;
@@ -209,6 +211,14 @@ void main()
             Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // rochoso
         Ks = vec3(0.5, 0.5, 0.5);
         q = 64.0;
+        
+        if (u_BolaInativa == 1) {
+            float ring = fract(V * 15.0 - u_Time * 3.0);
+            if (ring < 0.2) {
+                Kd0 = vec3(0.0, 0.8, 1.0);
+                Ks = vec3(1.0, 1.0, 1.0);
+            }
+        }
     }
     else if ( object_id == BURACO )
     {
@@ -428,7 +438,10 @@ void main()
     //    suas distâncias para a câmera (desenhando primeiro objetos
     //    transparentes que estão mais longe da câmera).
     // Alpha default = 1 = 100% opaco = 0% transparente
-    color.a = 1;
+    color.a = 1.0;
+    if (object_id == BOLA && u_BolaInativa == 1) {
+        color.a = 0.4;
+    }
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas

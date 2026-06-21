@@ -251,6 +251,9 @@ extern glm::vec3 g_PosTacoTwo;
 extern glm::vec3 g_VelocidadeBolaTwo;
 extern glm::mat4 g_BolaRotationMatrixTwo;
 
+extern int g_TacadasPlayer1;
+extern int g_TacadasPlayer2;
+
 // --- Loop Physics State Machine ---
 // Controla a física por Path Following (Waypoints) do loop (PistaLoop)
 extern bool g_BolaNoCaminho;

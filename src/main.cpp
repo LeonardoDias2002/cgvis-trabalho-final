@@ -470,14 +470,20 @@ int main(int argc, char* argv[])
         // Se estiver no MENU_LEVEL_COMPLETE ou MENU_PAUSE, queremos que a cena do jogo ainda seja desenhada por trás do overlay!
         // Então não damos 'continue', deixamos o render normal acontecer, e só bloqueamos as atualizações físicas.
 
-        if (g_TerminouJogada && glm::length(g_VelocidadeBola) < 0.001f && !g_BolaNoBuracoTwo && 
-        !g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
-            g_TerminouJogada = false; //reseta a variável para permitir a próxima jogada
-            g_JogadorAtual = true; // Muda para o próximo jogador (2)
-        } else if (g_TerminouJogada && glm::length(g_VelocidadeBolaTwo) < 0.11f && !g_BolaNoBuraco && 
-        g_JogadorAtual && g_MultiplayerAtivo && g_TempoDesdeTacada < 5.0f && g_TempoDesdeTacada > 3.0f) {
-            g_TerminouJogada = false; 
-            g_JogadorAtual = false; 
+        if (g_MultiplayerAtivo && g_TerminouJogada && (glfwGetTime() - g_TempoDesdeEspaco) > 0.2f) {
+            if (!g_JogadorAtual && glm::length(g_VelocidadeBola) < 0.02f) {
+                g_TerminouJogada = false;
+                if (!g_BolaNoBuracoTwo) {
+                    g_JogadorAtual = true;
+                    g_BolaEmFocoAtual = true;
+                }
+            } else if (g_JogadorAtual && glm::length(g_VelocidadeBolaTwo) < 0.02f) {
+                g_TerminouJogada = false;
+                if (!g_BolaNoBuraco) {
+                    g_JogadorAtual = false;
+                    g_BolaEmFocoAtual = false;
+                }
+            }
         }
 
         // Atualização da física da bola
@@ -524,19 +530,26 @@ int main(int argc, char* argv[])
         glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaParedesPista"), g_TexturaPistaParede);
         glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaBola"), g_TexturaBola);
         glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_TexturaTaco"), g_TexturaTaco);
+        glUniform1f(glGetUniformLocation(g_GpuProgramID, "u_Time"), glfwGetTime());
 
         g_TempoDesdeTacada = glfwGetTime() - g_TempoDesdeEspaco;
         //printf("Tempo desde a ultima tacada: %.2f \n", g_TempoDesdeTacada);
 
         // Calcular a força acumulada se a barra de espaço estiver sendo pressionada
-        if (g_EspacoPressionado && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0) {
+        bool active_ball_stopped = false;
+        if (!g_MultiplayerAtivo) active_ball_stopped = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
+        else active_ball_stopped = (!g_JogadorAtual) ? (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco) : (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo);
+        bool turn_ready = (!g_MultiplayerAtivo || !g_TerminouJogada);
+
+        if (g_EspacoPressionado && active_ball_stopped && turn_ready && g_TempoRotacaoTaco < 0.0) {
             double tempo_segurando = glfwGetTime() - g_InicioEspaco;
             // Limita a força (ex: 2 segundos para força máxima)
             g_ForcaTacada = std::min((float)tempo_segurando * 5.0f, 15.0f); 
         }
 
         // Controle suave de mira do taco (apenas se a bola estiver parada)
-        if ((glm::length(g_VelocidadeBola) < 0.1f) && (glm::length(g_VelocidadeBolaTwo) < 0.1f) && !g_BolaNoBuraco || !g_BolaNoBuracoTwo) {
+        // Controle suave de mira do taco (apenas se a bola estiver parada e for seu turno)
+        if (active_ball_stopped && turn_ready) {
             float delta_mira = M_PI * delta_time; // velocidade de rotação da mira
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
                 g_TacoRotacao += delta_mira;
@@ -656,8 +669,8 @@ int main(int argc, char* argv[])
         // Reativamos o Culling para os objetos 3D normais
         glEnable(GL_CULL_FACE);
 
-        // Trajetória da bola (renderizada apenas se estiver parada)
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && !g_JogadorAtual) {
+        // Trajetória da bola (renderizada apenas se estiver parada e puder jogar)
+        if (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco && !g_JogadorAtual && turn_ready) {
             glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_TrailColor"), 1.0f, 1.0f, 1.0f);
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
@@ -680,7 +693,7 @@ int main(int argc, char* argv[])
                 DrawVirtualObject("the_sphere");
             }
 
-        } else if (glm::length(g_VelocidadeBolaTwo) < 0.1f && !g_BolaNoBuraco && g_JogadorAtual) {
+        } else if (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo && g_JogadorAtual && turn_ready) {
             glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_TrailColor"), 1.0f, 1.0f, 1.0f);
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
@@ -732,8 +745,16 @@ int main(int argc, char* argv[])
             RenderTrail2();
         }
 
+        bool draw_club = false;
+        if (!g_MultiplayerAtivo) {
+            draw_club = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
+        } else if (!g_TerminouJogada) { // Only draw club if it's actively your turn
+            if (!g_JogadorAtual) draw_club = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
+            else draw_club = (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo);
+        }
+        
         // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
-        if (glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco) {
+        if (draw_club) {
             if(!g_JogadorAtual){
                 model = CalcularTaco(g_PosBola, g_PosTaco, g_DistanciaTaco);
             } else if(g_JogadorAtual){
@@ -750,17 +771,30 @@ int main(int argc, char* argv[])
               * Matrix_Scale(0.025f, 0.025f, 0.025f); // 0.025 encaixa no novo colisor de minigolf
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BOLA);
-        DrawVirtualObject("the_sphere");
+        
+        int inactive1 = (g_MultiplayerAtivo && g_JogadorAtual) ? 1 : 0;
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), inactive1);
+        if (inactive1) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
+        if (!g_BolaNoBuraco) DrawVirtualObject("the_sphere");
+        if (inactive1) { glDisable(GL_BLEND); }
 
         if(g_MultiplayerAtivo){
-                // se MP ativo desenhamos a Bola do segundo jogador
+            // se MP ativo desenhamos a Bola do segundo jogador
             model = Matrix_Translate(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z) 
-                * g_BolaRotationMatrix
+                * g_BolaRotationMatrixTwo
                 * Matrix_Scale(0.025f, 0.025f, 0.025f); 
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BOLA);
-            DrawVirtualObject("the_sphere");
+            
+            int inactive2 = (!g_JogadorAtual) ? 1 : 0;
+            glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), inactive2);
+            if (inactive2) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
+            if (!g_BolaNoBuracoTwo) DrawVirtualObject("the_sphere");
+            if (inactive2) { glDisable(GL_BLEND); }
         }
+        
+        // Reseta u_BolaInativa para não afetar outros objetos
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), 0);
 
 
         // Desenha a pista curva (nível 2)
@@ -1481,7 +1515,11 @@ void RotacionarTaco(GLFWwindow* window)
         g_TacoRotacaoVertical = angulo_inicial * (1.0f - (t * t));
     } else {
         // Fase 2: Impacto Físico
-        if (!bola_atingida && !g_BolaNoBuraco) {
+        bool buraco_atual = false;
+        if (!g_MultiplayerAtivo) buraco_atual = g_BolaNoBuraco;
+        else buraco_atual = (!g_JogadorAtual) ? g_BolaNoBuraco : g_BolaNoBuracoTwo;
+        
+        if (!bola_atingida && !buraco_atual) {
             bola_atingida = true;
             
             if (g_audioInitialized) {
@@ -1497,9 +1535,11 @@ void RotacionarTaco(GLFWwindow* window)
             if(!g_JogadorAtual){
                 g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
                 g_BolaEmFocoAtual = false; 
+                g_TacadasPlayer1++;
             } else {
                 g_VelocidadeBolaTwo = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
                 g_BolaEmFocoAtual = true; 
+                g_TacadasPlayer2++;
             }
         }
         
@@ -1879,8 +1919,18 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
     // Lógica para controle da força com Espaço
     if (key == GLFW_KEY_SPACE) {
+        bool pode_jogar = false;
+        if (!g_MultiplayerAtivo) {
+            pode_jogar = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
+        } else {
+            if (!g_JogadorAtual) {
+                pode_jogar = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
+            } else {
+                pode_jogar = (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo);
+            }
+        }
 
-        if (action == GLFW_PRESS && glm::length(g_VelocidadeBola) < 0.1f && !g_BolaNoBuraco && g_TempoRotacaoTaco < 0.0) {
+        if (action == GLFW_PRESS && pode_jogar && g_TempoRotacaoTaco < 0.0) {
             g_EspacoPressionado = true;
             g_InicioEspaco = glfwGetTime();
             g_ForcaTacada = 0.0f;
@@ -2661,16 +2711,34 @@ void MenuRenderOverlay(GLFWwindow* window)
         
         glUseProgram(textprogram_id);
         glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
-        TextRendering_PrintString(window, "Nivel Completo!", -0.3f, 0.3f, 1.8f);
+        TextRendering_PrintString(window, "Nivel Completo!", -0.3f, 0.5f, 1.8f);
+        
+        char buffer[100];
+        if (g_MultiplayerAtivo) {
+            int winner = (g_TacadasPlayer1 < g_TacadasPlayer2) ? 1 : (g_TacadasPlayer2 < g_TacadasPlayer1) ? 2 : 0;
+            if (winner == 1) sprintf(buffer, "Player 1 Venceu!");
+            else if (winner == 2) sprintf(buffer, "Player 2 Venceu!");
+            else sprintf(buffer, "Empate!");
+            TextRendering_PrintString(window, buffer, -0.2f, 0.35f, 1.2f);
+            
+            sprintf(buffer, "Player 1: %d tacadas", g_TacadasPlayer1);
+            TextRendering_PrintString(window, buffer, -0.3f, 0.25f, 1.0f);
+            
+            sprintf(buffer, "Player 2: %d tacadas", g_TacadasPlayer2);
+            TextRendering_PrintString(window, buffer, -0.3f, 0.15f, 1.0f);
+        } else {
+            sprintf(buffer, "Tacadas: %d", g_TacadasPlayer1);
+            TextRendering_PrintString(window, buffer, -0.15f, 0.3f, 1.2f);
+        }
         
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        g_HoverProxPista = RenderButton(window, 0.0f, 0.05f, btnW, btnH, 
+        g_HoverProxPista = RenderButton(window, 0.0f, -0.05f, btnW, btnH, 
                                         g_nivelAtual < 3 ? "Proxima Pista" : "Finalizar",
                                         0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
                                         
-        g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.2f, btnW, btnH, "Menu Principal",
+        g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.25f, btnW, btnH, "Menu Principal",
                                         0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
     } else if (g_CurrentState == MENU_PAUSE) {
         float btnW = 0.5f;
@@ -2817,6 +2885,7 @@ void MenuHandleClick(GLFWwindow* window)
     else if (g_CurrentState == MENU_MAIN) {
         if (g_HoverJogar) {
             g_CurrentState = MENU_LEVELS;
+            g_MultiplayerAtivo = false;
         }
         else if (g_HoverMultiplayer) {
             g_CurrentState = MENU_LEVELS;
@@ -2846,6 +2915,11 @@ void MenuHandleClick(GLFWwindow* window)
                 // Reset do estado do jogo
                 g_BolaNoBuraco = false;
                 g_BolaNoBuracoTwo = false;
+                g_TacadasPlayer1 = 0;
+                g_TacadasPlayer2 = 0;
+                g_TerminouJogada = false;
+                g_JogadorAtual = false;
+                g_BolaEmFocoAtual = false;
                 g_BolaRotationMatrix = glm::mat4(1.0f);
                 g_BolaRotationMatrixTwo = glm::mat4(1.0f);
                 g_TacoRotacao = 0.0f;
@@ -2932,6 +3006,11 @@ void ProxNivel(GLFWwindow* window) {
 
     g_BolaNoBuraco = false;
     g_BolaNoBuracoTwo = false;
+    g_TacadasPlayer1 = 0;
+    g_TacadasPlayer2 = 0;
+    g_TerminouJogada = false;
+    g_JogadorAtual = false;
+    g_BolaEmFocoAtual = false;
     g_VelocidadeBola = glm::vec3(0.0f);
     g_VelocidadeBolaTwo = glm::vec3(0.0f);
     g_BolaNoCaminho = false;
