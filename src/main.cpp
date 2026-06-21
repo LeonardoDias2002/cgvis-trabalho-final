@@ -1904,7 +1904,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
     // variaveis para rotacionar o taco de golfe
     float delta = M_PI / 16; // 22.5 graus radianos. podemos mudar depois
-    float deltaVertical = M_PI / 16; // 22.5 graus radianos
 
     if (key == GLFW_KEY_X && action == GLFW_PRESS)
     {
@@ -2065,9 +2064,6 @@ void TextRendering_ShowProjection(GLFWwindow* window)
     if ( !g_ShowInfoText )
         return;
 
-    float lineheight = TextRendering_LineHeight(window);
-    float charwidth = TextRendering_CharWidth(window);
-
 }
 
 // Escrevemos na tela o número de quadros renderizados por segundo (frames per second).
@@ -2112,8 +2108,6 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
         }
     }
 
-    float lineheight_vitoria = TextRendering_LineHeight(window) * 3.0f;
-    float charwidth_vitoria = TextRendering_CharWidth(window) * 3.0f;
 }
 
 // Função para debugging: imprime no terminal todas informações de um modelo
