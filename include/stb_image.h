@@ -1,3 +1,4 @@
+// FONTE: Biblioteca stb_image (https://github.com/nothings/stb)
 /* stb_image - v2.15 - public domain image loader - http://nothings.org/stb_image.h
                                      no warranty implied; use at your own risk
 

@@ -1,3 +1,4 @@
+// FONTE: Biblioteca tinyobjloader (https://github.com/tinyobjloader/tinyobjloader)
 /*
 The MIT License (MIT)
 

@@ -137,6 +137,23 @@ ma_sound g_victorySound;
 ma_sound g_wallSound;
 bool g_audioInitialized = false;
 
+// --- Zeppelin & Bezier ---
+float g_ZeppelinT = 0.0f;
+
+// Curva de Bezier Cúbica
+glm::vec3 CalculateBezierPoint(float t, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) {
+    float u = 1.0f - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+
+    glm::vec3 p = uuu * p0;
+    p += 3 * uu * t * p1;
+    p += 3 * u * tt * p2;
+    p += ttt * p3;
+    return p;
+}
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -218,6 +235,7 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/tronco.jpg");    // TextureImage4
     LoadTextureImage("../../data/grass.jpg");     // TextureImage5
     LoadTextureImage("../../data/track.jpg");     // TextureImage6
+    LoadTextureImage("../../data/zeppelin.png");  // TextureImage7
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -258,6 +276,9 @@ int main(int argc, char* argv[])
     BuildTrianglesAndAddToVirtualScene(&PistaCurvamodel);
 
     // Extrair triângulos da PistaCurva para heightmap (world space: scale=0.25, Y offset=0.064)
+    ObjModel Zeppelinmodel("../../data/zeppelin.obj");
+    ComputeNormals(&Zeppelinmodel);
+    BuildTrianglesAndAddToVirtualScene(&Zeppelinmodel);
     // APENAS triângulos com normal apontando pra cima (chão), excluindo paredes e teto
     {
         const auto& attrib = PistaCurvamodel.attrib;
@@ -774,6 +795,58 @@ int main(int argc, char* argv[])
             DrawVirtualObject("bordas_loop");
         }
 
+        // ==========================================
+        // Desenha o Zeppelin Voador com Curva de Bézier Cúbica (Loop Fechado)
+        // ==========================================
+        g_ZeppelinT += 0.1f * delta_time;
+        if (g_ZeppelinT > 2.0f) {
+            g_ZeppelinT -= 2.0f;
+        }
+
+        // Ponto A0: Frente direita da pista
+        glm::vec3 pA0(20.0f, 6.0f, 15.0f);
+        // Ponto A1: Passando alto atrás da pista
+        glm::vec3 pA1(5.0f, 12.0f, -20.0f);
+        // Ponto A2: Dando a volta na lateral esquerda
+        glm::vec3 pA2(-15.0f, 10.0f, -5.0f);
+        // Ponto A3: Fim do primeiro trajeto
+        glm::vec3 pA3(-15.0f, 8.0f, 15.0f);
+
+        // Pontos de controle da segunda metade para fechar o oval suavemente
+        glm::vec3 pB0 = pA3;
+        // Vetor de continuidade C1
+        glm::vec3 tangentA = pA3 - pA2; 
+        glm::vec3 pB1 = pA3 + tangentA; 
+        // Tangente inversa para voltar pro ponto A0 suavemente
+        glm::vec3 tangentB = pA0 - glm::vec3(15.0f, 6.0f, 20.0f); 
+        glm::vec3 pB2 = pA0 - tangentB; 
+        glm::vec3 pB3 = pA0;
+
+        glm::vec3 posZeppelin;
+        glm::vec3 nextPosZeppelin;
+
+        if (g_ZeppelinT <= 1.0f) {
+            posZeppelin = CalculateBezierPoint(g_ZeppelinT, pA0, pA1, pA2, pA3);
+            nextPosZeppelin = CalculateBezierPoint(std::min(1.0f, g_ZeppelinT + 0.01f), pA0, pA1, pA2, pA3);
+            if (g_ZeppelinT > 0.99f) nextPosZeppelin = CalculateBezierPoint(0.01f, pB0, pB1, pB2, pB3);
+        } else {
+            float t = g_ZeppelinT - 1.0f;
+            posZeppelin = CalculateBezierPoint(t, pB0, pB1, pB2, pB3);
+            nextPosZeppelin = CalculateBezierPoint(std::min(1.0f, t + 0.01f), pB0, pB1, pB2, pB3);
+            if (t > 0.99f) nextPosZeppelin = CalculateBezierPoint(0.01f, pA0, pA1, pA2, pA3);
+        }
+
+        glm::vec3 dirZeppelin = glm::normalize(nextPosZeppelin - posZeppelin);
+        float zeppelinYaw = atan2(-dirZeppelin.z, dirZeppelin.x);
+
+        model = Matrix_Translate(posZeppelin.x, posZeppelin.y, posZeppelin.z)
+              * Matrix_Rotate_Y(zeppelinYaw)
+              * Matrix_Scale(1.5f, 1.5f, 1.5f); // Escala uniforme (o modelo ja foi esticado na base)
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, ZEPPELIN);
+        DrawVirtualObject("Zeppelin");
+
         // Cenário: Árvores
         auto DrawTree = [&](float x, float y, float z, float scale, bool isTall) {
             glm::mat4 m = Matrix_Translate(x, y, z) * Matrix_Scale(scale, scale, scale);
@@ -1046,6 +1119,7 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5); 
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6); 
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8); 
     glUseProgram(0);
 }
 
@@ -2279,8 +2353,8 @@ void MenuInit()
     glBindVertexArray(0);
     g_LogoTextureID = LoadTextureImageRGBA("../../GOLFinho-removebg-preview.png", &g_LogoWidth, &g_LogoHeight);
     
-    // Bind to unit 7 for the flag shader
-    glActiveTexture(GL_TEXTURE7);
+    // Bind to unit 8 for the flag shader
+    glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_2D, g_LogoTextureID);
     glActiveTexture(GL_TEXTURE0);
 }
@@ -3095,30 +3169,49 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
             }
 
             if (fallback_to_planar) {
-                pos = next_pos;
                 float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
                 if (checkY < -1e8f) {
                     float min_d2_edge = 1e9f;
+                    glm::vec3 best_cp = next_pos;
                     for (const auto& tri : g_PistaLoopTriangles) {
                         glm::vec3 n;
                         glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
                         float dx = next_pos.x - cp.x;
+                        float dy = pos.y - cp.y;
                         float dz = next_pos.z - cp.z;
-                        float d2 = dx*dx + dz*dz;
-                        if (d2 < min_d2_edge) min_d2_edge = d2;
+                        float d2 = dx*dx + dy*dy + dz*dz;
+                        if (d2 < min_d2_edge) {
+                            min_d2_edge = d2;
+                            best_cp = cp;
+                        }
                     }
                     if (min_d2_edge > 0.0004f) {
-                        float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
-                        float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
-                        bool hitWall = false;
-                        if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
-                        if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                        glm::vec2 diff(next_pos.x - best_cp.x, next_pos.z - best_cp.z);
+                        float dist = glm::length(diff);
+                        if (dist > 1e-4f) {
+                            glm::vec2 wall_normal = diff / dist;
+                            glm::vec2 vel_xz(vel.x, vel.z);
+                            float vel_into_wall = glm::dot(vel_xz, wall_normal);
+                            if (vel_into_wall > 0.0f) {
+                                vel.x -= wall_normal.x * vel_into_wall * 1.5f;
+                                vel.z -= wall_normal.y * vel_into_wall * 1.5f;
+                                if (g_audioInitialized && vel_into_wall > 0.5f) {
+                                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                                    ma_sound_start(&g_wallSound);
+                                }
+                            }
+                        }
+                        next_pos.x = best_cp.x;
+                        next_pos.z = best_cp.z;
                     }
                 }
 
                 vel.x -= vel.x * 0.9f * sub; 
                 vel.z -= vel.z * 0.9f * sub;
                 if (glm::length(glm::vec3(vel.x, 0.0f, vel.z)) < 0.05f) { vel.x = 0.0f; vel.z = 0.0f; }
+
+                pos = next_pos;
                 
                 float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, pos.z, -1e9f);
                 if (sY < -1e8f && !g_PistaLoopTriangles.empty()) {
@@ -3185,35 +3278,41 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
 
         if (checkY < -1e8f) {
             float min_d2_edge = 1e9f;
+            glm::vec3 best_cp = next_pos;
             for (const auto& tri : floorTriangles) {
                 glm::vec3 n;
                 glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
                 float dx = next_pos.x - cp.x;
+                float dy = pos.y - cp.y;
                 float dz = next_pos.z - cp.z;
-                float d2 = dx*dx + dz*dz;
-                if (d2 < min_d2_edge) min_d2_edge = d2;
+                float d2 = dx*dx + dy*dy + dz*dz;
+                if (d2 < min_d2_edge) {
+                    min_d2_edge = d2;
+                    best_cp = cp;
+                }
             }
 
             if (min_d2_edge > 0.0004f) {
-                float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
-                float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
-
-                bool hitWall = false;
-                if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
-                if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
-                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
-                    next_pos.x = pos.x;
-                    next_pos.z = pos.z;
-                    vel.x *= -0.5f;
-                    vel.z *= -0.5f;
-                    hitWall = true;
+                glm::vec2 diff(next_pos.x - best_cp.x, next_pos.z - best_cp.z);
+                float dist = glm::length(diff);
+                if (dist > 1e-4f) {
+                    glm::vec2 wall_normal = diff / dist;
+                    glm::vec2 vel_xz(vel.x, vel.z);
+                    float vel_into_wall = glm::dot(vel_xz, wall_normal);
+                    
+                    if (vel_into_wall > 0.0f) {
+                        vel.x -= wall_normal.x * vel_into_wall * 1.5f;
+                        vel.z -= wall_normal.y * vel_into_wall * 1.5f;
+                        
+                        if (g_audioInitialized && vel_into_wall > 0.5f) {
+                            ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                            ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                            ma_sound_start(&g_wallSound);
+                        }
+                    }
                 }
-
-                if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
-                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                    ma_sound_start(&g_wallSound);
-                }
+                next_pos.x = best_cp.x;
+                next_pos.z = best_cp.z;
             }
         }
 

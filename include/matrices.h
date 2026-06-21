@@ -1,3 +1,4 @@
+// FONTE: Laboratórios da Disciplina de Computação Gráfica (UFRGS)
 #ifndef _MATRICES_H
 #define _MATRICES_H
 

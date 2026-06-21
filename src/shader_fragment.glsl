@@ -46,6 +46,7 @@ uniform mat4 projection;
 #define BORDASSIMPLES 20
 #define BORDASCURVA 21
 #define BORDASLOOP 22
+#define ZEPPELIN 24
 
 
 uniform int object_id;
@@ -70,8 +71,8 @@ uniform sampler2D TextureImage3; // Folhas (t7.jpg)
 uniform sampler2D TextureImage4; // Tronco (tronco.jpg)
 uniform sampler2D TextureImage5; // Grama (grass.jpg)
 uniform sampler2D TextureImage6; // Track (track.jpg)
-uniform sampler2D TextureImage7; // Logo (GOLFinho)
-
+uniform sampler2D TextureImage7; // Zeppelin metal
+uniform sampler2D TextureImage8; // Logo (GOLFinho)
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
 
@@ -234,7 +235,7 @@ void main()
         V = (V - 0.5) * 0.85 + 0.5;
 
         if (U >= 0.0 && U <= 1.0 && V >= 0.0 && V <= 1.0) {
-            vec4 logo = texture(TextureImage7, vec2(U,V));
+            vec4 logo = texture(TextureImage8, vec2(U,V));
             // Interpola suavemente as bordas usando o Alpha, fica muito mais nítido de longe
             Kd0 = mix(vec3(0.02, 0.02, 0.02), logo.rgb, logo.a);
         } else {
@@ -242,6 +243,34 @@ void main()
         }
         Ks = vec3(0.2, 0.2, 0.2); // Leve brilho
         q = 10.0;
+    }
+    else if ( object_id == ZEPPELIN )
+    {
+        // Usa a textura metálica gerada para o corpo
+        U = texcoords.x * 2.0;
+        V = texcoords.y * 2.0;
+        vec3 zeppelinColor = texture(TextureImage7, vec2(U,V)).rgb;
+
+        // Posição para colocar a logo na lateral do Zeppelin
+        float lu = texcoords.x * 4.0 - 1.5;
+        float lv = texcoords.y * 4.0 - 1.5;
+
+        if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0) {
+            vec4 logo = texture(TextureImage8, vec2(1.0 - lv, 1.0 - lu));
+            zeppelinColor = mix(zeppelinColor, logo.rgb, logo.a);
+        }
+
+        // Se quiser a logo do outro lado também
+        float lu2 = texcoords.x * 4.0 - 1.5;
+        float lv2 = texcoords.y * 4.0 + 0.5;
+        if (lu2 >= 0.0 && lu2 <= 1.0 && lv2 >= 0.0 && lv2 <= 1.0) {
+            vec4 logo = texture(TextureImage8, vec2(lv2, lu2));
+            zeppelinColor = mix(zeppelinColor, logo.rgb, logo.a);
+        }
+
+        Kd0 = zeppelinColor;
+        Ks = vec3(0.8, 0.8, 0.8); // Muito reflexivo (metálico)
+        q = 64.0;
     }
     else if ( object_id == GRAMA )
     {

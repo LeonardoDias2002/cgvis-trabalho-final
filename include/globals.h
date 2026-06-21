@@ -149,6 +149,7 @@ struct SceneObject
 #define BORDASCURVA 21
 #define BORDASLOOP 22
 #define TRONCO 23
+#define ZEPPELIN 24
 // =============================================
 // ENUM DE ESTADO DO JOGO
 // =============================================
