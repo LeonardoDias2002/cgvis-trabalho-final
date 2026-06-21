@@ -3098,11 +3098,22 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                 pos = next_pos;
                 float checkY = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
                 if (checkY < -1e8f) {
-                    float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
-                    float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
-                    bool hitWall = false;
-                    if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
-                    if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                    float min_d2_edge = 1e9f;
+                    for (const auto& tri : g_PistaLoopTriangles) {
+                        glm::vec3 n;
+                        glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                        float dx = next_pos.x - cp.x;
+                        float dz = next_pos.z - cp.z;
+                        float d2 = dx*dx + dz*dz;
+                        if (d2 < min_d2_edge) min_d2_edge = d2;
+                    }
+                    if (min_d2_edge > 0.0004f) {
+                        float checkY_X = RaycastTrackHeight(g_PistaLoopTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
+                        float checkY_Z = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
+                        bool hitWall = false;
+                        if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
+                        if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                    }
                 }
 
                 vel.x -= vel.x * 0.9f * sub; 
@@ -3173,24 +3184,36 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
         float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
 
         if (checkY < -1e8f) {
-            float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
-            float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
-
-            bool hitWall = false;
-            if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
-            if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
-            if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
-                next_pos.x = pos.x;
-                next_pos.z = pos.z;
-                vel.x *= -0.5f;
-                vel.z *= -0.5f;
-                hitWall = true;
+            float min_d2_edge = 1e9f;
+            for (const auto& tri : floorTriangles) {
+                glm::vec3 n;
+                glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                float dx = next_pos.x - cp.x;
+                float dz = next_pos.z - cp.z;
+                float d2 = dx*dx + dz*dz;
+                if (d2 < min_d2_edge) min_d2_edge = d2;
             }
 
-            if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
-                ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                ma_sound_start(&g_wallSound);
+            if (min_d2_edge > 0.0004f) {
+                float checkY_X = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, pos.z, -1e9f);
+                float checkY_Z = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
+
+                bool hitWall = false;
+                if (checkY_X < -1e8f) { next_pos.x = pos.x; vel.x *= -0.5f; hitWall = true; }
+                if (checkY_Z < -1e8f) { next_pos.z = pos.z; vel.z *= -0.5f; hitWall = true; }
+                if (checkY_X >= -1e8f && checkY_Z >= -1e8f) {
+                    next_pos.x = pos.x;
+                    next_pos.z = pos.z;
+                    vel.x *= -0.5f;
+                    vel.z *= -0.5f;
+                    hitWall = true;
+                }
+
+                if (hitWall && g_audioInitialized && glm::length(vel) > 0.5f) {
+                    ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                    ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                    ma_sound_start(&g_wallSound);
+                }
             }
         }
 
