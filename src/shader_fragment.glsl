@@ -75,6 +75,7 @@ uniform sampler2D TextureImage5; // Grama (grass.jpg)
 uniform sampler2D TextureImage6; // Track (track.jpg)
 uniform sampler2D TextureImage7; // Zeppelin metal
 uniform sampler2D TextureImage8; // Logo (GOLFinho)
+uniform sampler2D TextureImage9; // paredes padrão
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
 
@@ -338,7 +339,7 @@ void main()
         }
 
         if (u_TexturaParedesPista == 0)
-            Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+            Kd0 = texture(TextureImage9, vec2(U,V)).rgb;
         else if (u_TexturaParedesPista == 1)
             Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
         else
