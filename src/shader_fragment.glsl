@@ -323,35 +323,53 @@ void main()
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
-        // Gerar UVs procedurais a partir da posição em world space
-        vec4 world_pos = model * position_model;
-        // Normal em world space para distinguir chão vs parede
-        vec4 world_normal = model * normal;
-        float up_dot = abs(normalize(world_normal).y);
-
-        if (up_dot > 0.5) {
-            // Chão (normal apontando pra cima): textura da grama/chão
+        vec4 world_pos = position_world;
+        
+        // Pistas são o chão. Box projection para evitar esticamento no loop:
+        vec3 n_abs = abs(normalize(normal.xyz));
+        if (n_abs.y > n_abs.x && n_abs.y > n_abs.z) {
             U = world_pos.x * 2.0;
             V = world_pos.z * 2.0;
-            if (u_TexturaGramaPista == 0)
-                Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
-            else if (u_TexturaGramaPista == 1)
-                Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
-            else if (u_TexturaGramaPista == 2)
-                Kd0 = texture(TextureImage6, vec2(U,V)).rgb;
-            else
-                Kd0 = vec3(0.2, 0.7, 0.2);
+        } else if (n_abs.x > n_abs.z) {
+            U = world_pos.z * 2.0;
+            V = world_pos.y * 2.0;
         } else {
-            // Parede (normal lateral): textura das paredes, independente
-            U = world_pos.y * 3.0 + world_pos.z * 3.0;
-            V = world_pos.x * 3.0;
-            if (u_TexturaParedesPista == 0)
-                Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
-            else if (u_TexturaParedesPista == 1)
-                Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
-            else
-                Kd0 = vec3(0.5, 0.5, 0.5);
+            U = world_pos.x * 2.0;
+            V = world_pos.y * 2.0;
         }
+
+        if (u_TexturaGramaPista == 0)
+            Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+        else if (u_TexturaGramaPista == 1)
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+        else if (u_TexturaGramaPista == 2)
+            Kd0 = texture(TextureImage6, vec2(U,V)).rgb;
+        else
+            Kd0 = vec3(0.2, 0.7, 0.2);
+    }
+    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP )
+    {
+        vec4 world_pos = position_world;
+        
+        // Bordas são as paredes. Box projection para não esticar:
+        vec3 n_abs = abs(normalize(normal.xyz));
+        if (n_abs.y > n_abs.x && n_abs.y > n_abs.z) {
+            U = world_pos.x * 3.0;
+            V = world_pos.z * 3.0;
+        } else if (n_abs.x > n_abs.z) {
+            U = world_pos.z * 3.0;
+            V = world_pos.y * 3.0;
+        } else {
+            U = world_pos.x * 3.0;
+            V = world_pos.y * 3.0;
+        }
+
+        if (u_TexturaParedesPista == 0)
+            Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+        else if (u_TexturaParedesPista == 1)
+            Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+        else
+            Kd0 = vec3(0.5, 0.5, 0.5);
     }
     else if ( object_id == MASTRO )
     {
