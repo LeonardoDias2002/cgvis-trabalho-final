@@ -81,7 +81,7 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 <mark>`Haverão testes de intersecção da bolinha com o chão e as paredes da pista, bem como com obstáculos (como o loop). Não haverá colisão entre as bolinhas dos dois jogadores; a bola do jogador inativo ficará translúcida e intangível durante o turno do outro.`</mark>
 
 ### Modelos de Iluminação em todos os objetos
-<mark>`Utilizaremos o modelo de iluminação de Blinn-Phong (com componentes Ambiente, Difusa de Lambert e Especular) aplicado em todos os objetos renderizados.</mark>
+<mark>`Utilizaremos o modelo de iluminação de Blinn-Phong (com componentes Ambiente, Difusa de Lambert e Especular) aplicado em todos os objetos renderizados.`</mark>
 
 ### Mapeamento de texturas em todos os objetos
 <mark>`A grama e as paredes da pista, bem como a bolinha terão texturas customizáveis que poderão ser escolhidas pelo jogador.`</mark>
