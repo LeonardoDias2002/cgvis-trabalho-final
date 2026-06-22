@@ -70,7 +70,7 @@ float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
 
         glm::vec3 e1 = tri.v1 - tri.v0;
         glm::vec3 e2 = tri.v2 - tri.v0;
-        
+
         glm::vec3 h = glm::cross(dir, e2);
         float a = glm::dot(e1, h);
         if (std::fabs(a) < 1e-7f) continue; // Paralelo

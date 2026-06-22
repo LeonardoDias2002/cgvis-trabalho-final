@@ -75,19 +75,19 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 <mark>`Após a tacada a câmera seguirá a bola, antes disso ficando fixa atrás da mesma. A câmera também alternará conforme o turno de cada jogador. `</mark>
 
 ### Instâncias de objetos
-<mark>`A cada nível teremos duas bolinhas (uma para cada jogador), a bandeira indicando onde está o buraco na pista, um mapa único e, no momento da tacada, o taco do jogador aparecerá.`</mark>
+<mark>`A cada nível teremos duas bolinhas (uma para cada jogador instanciando a mesma malha), a bandeira indicando onde está o buraco na pista e o taco do jogador. Também teremos instâncias de modelos para gerar a floresta ao redor da pista e o zepelin flutuando no céu.`</mark>
 
 ### Testes de intersecção
-<mark>`Haverão testes de colisão da bolinha com as paredes e/ou obstáculos da pista, bem como com a bola do outro jogador.`</mark>
+<mark>`Haverão testes de intersecção da bolinha com o chão e as paredes da pista, bem como com obstáculos (como o loop). Não haverá colisão entre as bolinhas dos dois jogadores; a bola do jogador inativo ficará translúcida e intangível durante o turno do outro.`</mark>
 
 ### Modelos de Iluminação em todos os objetos
-<mark>`Utilizaremos o modelo de iluminação de Lambert, a ser aplicado em todos os objetos relevantes do jogo.`</mark>
+<mark>`Utilizaremos o modelo de iluminação de Blinn-Phong (com componentes Ambiente, Difusa de Lambert e Especular) aplicado em todos os objetos renderizados.</mark>
 
 ### Mapeamento de texturas em todos os objetos
 <mark>`A grama e as paredes da pista, bem como a bolinha terão texturas customizáveis que poderão ser escolhidas pelo jogador.`</mark>
 
 ### Movimentação com curva Bézier cúbica
-<mark>`A movimentação da bolinha no caso da tacada sair do chão, a trajetória dela será de acordo com uma curva de Bézier cúbica. No início do nível a câmera rotacionará ao redor dele para mostrar o design da pista para os jogadores.`</mark>
+<mark>`A movimentação de um zepelin no céu será definida através de uma curva de Bézier cúbica. Ele fará uma trajetória contínua e suave, voando em um circuito paramétrico fechado ao redor da pista durante a gameplay.`</mark>
 
 ### Animações baseadas no tempo ($\Delta t$)
 <mark>`Haverão animações baseadas no tempo na movimentação da bola após a tacada, bem como em caso de colisões, e no taco do jogador no momento da jogada.`</mark>

@@ -113,7 +113,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 // função para avançar para o próximo nível
-void ProxNivel(GLFWwindow* window); 
+void ProxNivel(GLFWwindow* window);
 
 // função para atualizar as posições das bolas de golfe
 void AtualizarFisicaBola(float delta_time);
@@ -400,14 +400,14 @@ int main(int argc, char* argv[])
     ComputeNormals(&ArvoreBaixamodel);
     BuildTrianglesAndAddToVirtualScene(&ArvoreBaixamodel);
 
-    // Arvore Alta 
+    // Arvore Alta
     ObjModel ArvoreAltamodel("../../data/ArvoreAlta.obj");
     ComputeNormals(&ArvoreAltamodel);
     BuildTrianglesAndAddToVirtualScene(&ArvoreAltamodel);
 
     if ( argc > 1 ) {
         ObjModel model(argv[1]);
-        BuildTrianglesAndAddToVirtualScene(&model); 
+        BuildTrianglesAndAddToVirtualScene(&model);
     }
 
     // Inicializamos o código para renderização de texto.
@@ -430,19 +430,19 @@ int main(int argc, char* argv[])
         ma_sound_set_looping(&g_musicMenu, MA_TRUE);
         ma_sound_init_from_file(&g_audioEngine, "../../data/ambiente.mp3", MA_SOUND_FLAG_STREAM, NULL, NULL, &g_ambientSound);
         ma_sound_set_looping(&g_ambientSound, MA_TRUE);
-        
+
         // Efeitos sonoros na memória
         ma_sound_init_from_file(&g_audioEngine, "../../data/hit.wav", 0, NULL, NULL, &g_hitSound);
         ma_sound_init_from_file(&g_audioEngine, "../../data/vitoria.mp3", 0, NULL, NULL, &g_victorySound);
         ma_sound_init_from_file(&g_audioEngine, "../../data/wall.wav", 0, NULL, NULL, &g_wallSound);
-        
+
         // Volumes iniciais
         ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
         ma_sound_set_volume(&g_ambientSound, g_AmbientVolume);
         ma_sound_set_volume(&g_hitSound, g_AmbientVolume);
         ma_sound_set_volume(&g_victorySound, g_AmbientVolume);
         ma_sound_set_volume(&g_wallSound, g_AmbientVolume);
-        
+
         // Inicia música do menu
         if (g_CurrentState != PLAYING) {
             ma_sound_start(&g_musicMenu);
@@ -466,7 +466,7 @@ int main(int argc, char* argv[])
             glfwPollEvents();
             continue;
         }
-        
+
         // Se estiver no MENU_LEVEL_COMPLETE ou MENU_PAUSE, queremos que a cena do jogo ainda seja desenhada por trás do overlay!
         // Então não damos 'continue', deixamos o render normal acontecer, e só bloqueamos as atualizações físicas.
 
@@ -503,7 +503,7 @@ int main(int argc, char* argv[])
                 }
             }
         }
-        
+
         // Atualiza a idade dos segmentos de trilha
         UpdateTrailSegments(delta_time);
 
@@ -544,7 +544,7 @@ int main(int argc, char* argv[])
         if (g_EspacoPressionado && active_ball_stopped && turn_ready && g_TempoRotacaoTaco < 0.0) {
             double tempo_segurando = glfwGetTime() - g_InicioEspaco;
             // Limita a força (ex: 2 segundos para força máxima)
-            g_ForcaTacada = std::min((float)tempo_segurando * 5.0f, 15.0f); 
+            g_ForcaTacada = std::min((float)tempo_segurando * 5.0f, 15.0f);
         }
 
         // Controle suave de mira do taco (apenas se a bola estiver parada)
@@ -560,7 +560,7 @@ int main(int argc, char* argv[])
         }
 
         RotacionarTaco(window); // chamamos a função que rotaciona o taco
-        
+
         AtualizarCamera(); // chamamos a função que atualiza a câmera
 
         // Agora computamos a matriz de Projeção.
@@ -575,8 +575,8 @@ int main(int argc, char* argv[])
         {
             // Projeção Perspectiva.
             // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-            
-            
+
+
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && field_of_view < M_PI / 1.75f) { //Zoom in máximo (π/1.75 rad = 102.85 graus)
                 field_of_view = field_of_view * 1.01f; //Taxa de zoom in
             }
@@ -611,8 +611,8 @@ int main(int argc, char* argv[])
         }
 
         projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-    
-    
+
+
         glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
         // Enviamos as matrizes "view" e "projection" para a placa de vídeo
@@ -627,7 +627,7 @@ int main(int argc, char* argv[])
         glDisable(GL_CULL_FACE);
 
         // Chão de GRAMA (Terreno Aberto)
-        
+
         model = Matrix_Translate(0.0f, -0.01f, 0.0f) * Matrix_Scale(50.0f, 1.0f, 50.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GRAMA);
@@ -675,19 +675,19 @@ int main(int argc, char* argv[])
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
             glm::vec3 dir_arremesso = glm::vec3(-cosseno, 0.0f, -seno);
-            
+
             float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f;
             int num_dots = (int)(forca_base * 4.0f);
             float step = 0.1f;
-            
+
             glUniform1i(g_object_id_uniform, TRAJETORIA);
             for (int i = 1; i <= num_dots; i++) {
                 glm::vec3 pos_dot = g_PosBola + dir_arremesso * (i * step);
-                
+
                 float ray_y = g_PosBola.y;
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
-                
+
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
                 DrawVirtualObject("the_sphere");
@@ -698,25 +698,25 @@ int main(int argc, char* argv[])
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
             glm::vec3 dir_arremesso = glm::vec3(-cosseno, 0.0f, -seno);
-            
+
             float forca_base = g_EspacoPressionado ? g_ForcaTacada : 2.0f;
             int num_dots = (int)(forca_base * 4.0f);
             float step = 0.1f;
-            
+
             glUniform1i(g_object_id_uniform, TRAJETORIA);
             for (int i = 1; i <= num_dots; i++) {
                 glm::vec3 pos_dot = g_PosBolaTwo + dir_arremesso * (i * step);
-                
+
                 float ray_y = g_PosBolaTwo.y;
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
-                
+
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
                 DrawVirtualObject("the_sphere");
             }
         }
-        
+
 
         // Passa a posição do buraco para o shader para descartar os fragmentos da pista e criar o buraco físico
         glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), g_HolePosition.x, g_HolePosition.y, g_HolePosition.z);
@@ -752,7 +752,7 @@ int main(int argc, char* argv[])
             if (!g_JogadorAtual) draw_club = (glm::length(g_VelocidadeBola) < 0.02f && !g_BolaNoBuraco);
             else draw_club = (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo);
         }
-        
+
         // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
         if (draw_club) {
             if(!g_JogadorAtual){
@@ -766,12 +766,12 @@ int main(int argc, char* argv[])
         }
 
         // desenhamos a Bola de Golfe perfeitamente centralizada e no tamanho correto (0.025)
-        model = Matrix_Translate(g_PosBola.x, g_PosBola.y, g_PosBola.z) 
+        model = Matrix_Translate(g_PosBola.x, g_PosBola.y, g_PosBola.z)
               * g_BolaRotationMatrix
               * Matrix_Scale(0.025f, 0.025f, 0.025f); // 0.025 encaixa no novo colisor de minigolf
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BOLA);
-        
+
         int inactive1 = (g_MultiplayerAtivo && g_JogadorAtual) ? 1 : 0;
         glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), inactive1);
         if (inactive1) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
@@ -780,19 +780,19 @@ int main(int argc, char* argv[])
 
         if(g_MultiplayerAtivo){
             // se MP ativo desenhamos a Bola do segundo jogador
-            model = Matrix_Translate(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z) 
+            model = Matrix_Translate(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z)
                 * g_BolaRotationMatrixTwo
-                * Matrix_Scale(0.025f, 0.025f, 0.025f); 
+                * Matrix_Scale(0.025f, 0.025f, 0.025f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BOLA);
-            
+
             int inactive2 = (!g_JogadorAtual) ? 1 : 0;
             glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), inactive2);
             if (inactive2) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
             if (!g_BolaNoBuracoTwo) DrawVirtualObject("the_sphere");
             if (inactive2) { glDisable(GL_BLEND); }
         }
-        
+
         // Reseta u_BolaInativa para não afetar outros objetos
         glUniform1i(glGetUniformLocation(g_GpuProgramID, "u_BolaInativa"), 0);
 
@@ -849,11 +849,11 @@ int main(int argc, char* argv[])
         // Pontos de controle da segunda metade para fechar o oval suavemente
         glm::vec3 pB0 = pA3;
         // Vetor de continuidade C1
-        glm::vec3 tangentA = pA3 - pA2; 
-        glm::vec3 pB1 = pA3 + tangentA; 
+        glm::vec3 tangentA = pA3 - pA2;
+        glm::vec3 pB1 = pA3 + tangentA;
         // Tangente inversa para voltar pro ponto A0 suavemente
-        glm::vec3 tangentB = pA0 - glm::vec3(15.0f, 6.0f, 20.0f); 
-        glm::vec3 pB2 = pA0 - tangentB; 
+        glm::vec3 tangentB = pA0 - glm::vec3(15.0f, 6.0f, 20.0f);
+        glm::vec3 pB2 = pA0 - tangentB;
         glm::vec3 pB3 = pA0;
 
         glm::vec3 posZeppelin;
@@ -908,22 +908,22 @@ int main(int argc, char* argv[])
             for (int i = 0; i < 60; i++) {
                 float angle = (i / 60.0f) * 2.0f * M_PI;
                 // Raio variavel adaptado pro tamanho da fase
-                float radius = 10.0f + (i % 5) * 1.5f; 
+                float radius = 10.0f + (i % 5) * 1.5f;
                 float tx = cx + cos(angle) * radius;
-                float tz = cz + sin(angle) * radius; 
-                
+                float tz = cz + sin(angle) * radius;
+
                 bool tall = (i % 2 == 0);
                 float scale = tall ? 0.15f + (i % 4)*0.03f : 0.1f + (i % 3)*0.02f;
                 DrawTree(tx, 0.0f, tz, scale, tall);
             }
-            
+
             // Segunda camada de árvores para dar mais volume visual
             for (int i = 0; i < 40; i++) {
                 float angle = (i / 40.0f) * 2.0f * M_PI + 0.1f;
-                float radius = 16.0f + (i % 4) * 2.0f; 
+                float radius = 16.0f + (i % 4) * 2.0f;
                 float tx = cx + cos(angle) * radius;
                 float tz = cz + sin(angle) * radius;
-                
+
                 bool tall = (i % 3 != 0);
                 float scale = tall ? 0.18f + (i % 3)*0.02f : 0.12f + (i % 2)*0.02f;
                 DrawTree(tx, 0.0f, tz, scale, tall);
@@ -934,38 +934,38 @@ int main(int argc, char* argv[])
         model = Matrix_Translate(g_HolePosition.x + 0.3f, g_HolePosition.y, g_HolePosition.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, MASTRO);
-        DrawVirtualObject("Bandeira_Mastro"); 
-        
+        DrawVirtualObject("Bandeira_Mastro");
+
         glDisable(GL_CULL_FACE); // A bandeira é um plano 2D, queremos vê-la dos dois lados
         glUniform1i(g_object_id_uniform, BANDEIRA);
-        DrawVirtualObject("Blandeira"); 
-        glEnable(GL_CULL_FACE); 
+        DrawVirtualObject("Blandeira");
+        glEnable(GL_CULL_FACE);
 
 
         // Desenha a HUD da Barra de Força em NDC (Tela 2D)
         if (g_EspacoPressionado) {
             glDisable(GL_DEPTH_TEST); // Garante que a HUD seja desenhada por cima de tudo
-            
+
             glm::mat4 identity = Matrix_Identity();
             glUniformMatrix4fv(g_view_uniform, 1, GL_FALSE, glm::value_ptr(identity));
             glUniformMatrix4fv(g_projection_uniform, 1, GL_FALSE, glm::value_ptr(identity));
             glUniform1i(g_object_id_uniform, HUD_BARRA);
-            
+
             float percent = std::min(g_ForcaTacada / 15.0f, 1.0f);
             GLint g_forca_percent_uniform = glGetUniformLocation(g_GpuProgramID, "u_ForcaPercent");
             glUniform1f(g_forca_percent_uniform, percent);
-            
-            // O the_plane original geralmente vai de -1 a 1 (largura 2). 
+
+            // O the_plane original geralmente vai de -1 a 1 (largura 2).
             // Queremos centralizar a barra embaixo: y = -0.8
             // Para crescer da esquerda pra direita, o centro X precisa transladar
             float max_width = 0.4f; // Tamanho máximo da barra
-            float scale_x = percent * max_width; 
+            float scale_x = percent * max_width;
             float pos_x = -0.5f + scale_x; // Começa em -0.5 (X=-0.5), e se move pra direita
-            
+
             model = Matrix_Translate(pos_x, -0.8f, 0.0f) * Matrix_Scale(scale_x, 0.05f, 1.0f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             DrawVirtualObject("the_plane");
-            
+
             glEnable(GL_DEPTH_TEST); // Restaura
         }
 
@@ -1151,12 +1151,12 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); 
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4); 
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5); 
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6); 
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7); 
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8); 
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
     glUseProgram(0);
 }
 
@@ -1441,8 +1441,8 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
 // função que calcula a posição e orientação do taco de golfe baseado na posição da bola
 
 //  posicao_bola: posição  da bola de golfe
-//  direcao_taco: direção emque o taco está apontando 
-//  distancia: distância entre a bola e o  taco 
+//  direcao_taco: direção emque o taco está apontando
+//  distancia: distância entre a bola e o  taco
 
 //IMPOTANTE: é OBRIGATÓRIO usar mat4 se não o código quebra, demorei para entender isso
 //segundo um cara no stackoverflow "matrizes 4x4 são as únicas capazes de combinar translação, rotação e escala em uma única estrutura matemática"
@@ -1450,32 +1450,32 @@ glm::mat4 CalcularTaco(glm::vec3 posicao_bola, glm::vec3 direcao_taco, float dis
 {
     // 1. Escala original do taco
     glm::mat4 m_scale = Matrix_Scale(0.05f, 0.05f, 0.05f);
-    
+
     // 2. Gira 90 graus POSITIVO para alinhar a face plana do taco para frente (direção do impacto, eixo -X)
     glm::mat4 m_rot_y_mesh = Matrix_Rotate_Y(M_PI / 2.0f);
-    
+
     // 3. Ajuste fino do impacto. O raio da bola é 0.025. Queremos que a face do taco toque exatamente em X=+0.025.
     glm::mat4 m_ajuste_impacto = Matrix_Translate(0.017f, -0.01f, -0.046f);
-    
+
     // 4. Pivô do Pêndulo. O jogador segura o taco no Grip (altura Y=0.34).
-    glm::mat4 m_pivot = Matrix_Translate(-0.017f, -0.34f, +0.046f); 
-    
+    glm::mat4 m_pivot = Matrix_Translate(-0.017f, -0.34f, +0.046f);
+
     // 5. Swing (Pêndulo no eixo Z local).
     // Ângulo POSITIVO rotaciona a cabeça do taco para +X (puxando para TRÁS, para a câmera).
     glm::mat4 m_swing = Matrix_Rotate_Z(g_TacoRotacaoVertical);
-    
+
     // 6. Retorna o grip para a posição exata de stance.
     glm::mat4 m_unpivot = Matrix_Translate(0.017f, 0.34f, -0.046f);
-    
+
     // 7. Rotação do jogador (Mira). Gira toda a mecânica ao redor do centro da bola (eixo Y).
     // O SINAL DEVE SER NEGATIVO (-g_TacoRotacao) PARA ACOMPANHAR A CÂMERA DO JOGADOR!
     glm::mat4 m_mira = Matrix_Rotate_Y(-g_TacoRotacao);
-    
+
     // 8. Coloca na posição final do mundo
     glm::mat4 m_pos = Matrix_Translate(posicao_bola.x, posicao_bola.y, posicao_bola.z);
-    
+
     glm::mat4 modelo = m_pos * m_mira * m_unpivot * m_swing * m_pivot * m_ajuste_impacto * m_rot_y_mesh * m_scale;
-    
+
     return modelo;
 }
 
@@ -1484,9 +1484,9 @@ void RotacionarTaco(GLFWwindow* window)
 {
     static bool bola_atingida = false;
 
-    if (g_TempoRotacaoTaco < 0.0) 
+    if (g_TempoRotacaoTaco < 0.0)
     {
-        bola_atingida = false; 
+        bola_atingida = false;
         if (g_EspacoPressionado) {
             float percent = std::min(g_ForcaTacada / 15.0f, 1.0f);
             g_TacoRotacaoVertical = percent * g_AnguloRotacaoTaco; // Puxa pra trás
@@ -1495,57 +1495,57 @@ void RotacionarTaco(GLFWwindow* window)
         }
         return;
     }
-    
+
     double Atual = glfwGetTime();
     double Total = Atual - g_TempoRotacaoTaco;
-    
-    float duracao_descida = 0.15f; 
-    
+
+    float duracao_descida = 0.15f;
+
     float percent_forca = std::min(g_ForcaTacada / 15.0f, 1.0f);
-    float angulo_inicial = percent_forca * g_AnguloRotacaoTaco; 
+    float angulo_inicial = percent_forca * g_AnguloRotacaoTaco;
 
     // Termina a tacada logo após o impacto para garantir que ele pare encostado!
-    if (Total >= duracao_descida + 0.1f) 
+    if (Total >= duracao_descida + 0.1f)
     {
         g_TacoRotacaoVertical = 0.0f;
-        g_TempoRotacaoTaco = -1.0; 
+        g_TempoRotacaoTaco = -1.0;
         return;
     }
-    
+
     if (Total <= duracao_descida) {
         // Fase 1: Descida (Aceleração Quadrática até bater no 0)
-        float t = (float)(Total / duracao_descida); 
+        float t = (float)(Total / duracao_descida);
         g_TacoRotacaoVertical = angulo_inicial * (1.0f - (t * t));
     } else {
         // Fase 2: Impacto Físico
         bool buraco_atual = false;
         if (!g_MultiplayerAtivo) buraco_atual = g_BolaNoBuraco;
         else buraco_atual = (!g_JogadorAtual) ? g_BolaNoBuraco : g_BolaNoBuracoTwo;
-        
+
         if (!bola_atingida && !buraco_atual) {
             bola_atingida = true;
-            
+
             if (g_audioInitialized) {
                 ma_sound_set_volume(&g_hitSound, g_AmbientVolume);
                 ma_sound_seek_to_pcm_frame(&g_hitSound, 0);
                 ma_sound_start(&g_hitSound);
             }
-            
-            float forca = std::max(2.0f, g_ForcaTacada); 
+
+            float forca = std::max(2.0f, g_ForcaTacada);
             float cosseno = cos(g_TacoRotacao);
             float seno = sin(g_TacoRotacao);
-            
+
             if(!g_JogadorAtual){
                 g_VelocidadeBola = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
-                g_BolaEmFocoAtual = false; 
+                g_BolaEmFocoAtual = false;
                 g_TacadasPlayer1++;
             } else {
                 g_VelocidadeBolaTwo = glm::vec3(-cosseno * forca, 0.0f, -seno * forca);
-                g_BolaEmFocoAtual = true; 
+                g_BolaEmFocoAtual = true;
                 g_TacadasPlayer2++;
             }
         }
-        
+
         // Mantém o taco em repouso perfeito na posição inicial (encostado onde a bola estava)
         g_TacoRotacaoVertical = 0.0f;
     }
@@ -1688,7 +1688,7 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id)
         fprintf(stderr, "%s", output.c_str());
     }
 
-    // Os "Shader Objects" podem ser marcados para deleção após serem linkados 
+    // Os "Shader Objects" podem ser marcados para deleção após serem linkados
     glDeleteShader(vertex_shader_id);
     glDeleteShader(fragment_shader_id);
     // Retornamos o ID gerado acima
@@ -1734,7 +1734,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_LeftMouseButtonPressed = true;
 
-        rotacao_camera = true; //habilitamos a rotação da camera   
+        rotacao_camera = true; //habilitamos a rotação da camera
 
     }
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
@@ -1751,7 +1751,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_RightMouseButtonPressed = true;
 
-        rotacao_camera = false; //desabilitamos a rotação da camera      
+        rotacao_camera = false; //desabilitamos a rotação da camera
 
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
@@ -1795,21 +1795,21 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
-    
+
         // Atualizamos parâmetros da câmera com os deslocamentos
         g_CameraTheta -= 0.01f*dx;
         g_CameraPhi   += 0.01f*dy;
-    
+
         // Em coordenadas esféricas, o ângulo phi deve ficar entre um valor mínimo acima do chão e +pi/2.
         float phimax = M_PI/2;
         float phimin = 0.1f;
-    
+
         if (g_CameraPhi > phimax)
             g_CameraPhi = phimax;
-    
+
         if (g_CameraPhi < phimin)
             g_CameraPhi = phimin;
-    
+
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
@@ -1821,11 +1821,11 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
-    
+
         // Atualizamos parâmetros da antebraço com os deslocamentos
         g_ForearmAngleZ -= 0.01f*dx;
         g_ForearmAngleX += 0.01f*dy;
-    
+
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
@@ -1837,11 +1837,11 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
-    
+
         // Atualizamos parâmetros da antebraço com os deslocamentos
         g_TorsoPositionX += 0.01f*dx;
         g_TorsoPositionY -= 0.01f*dy;
-    
+
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
@@ -2089,7 +2089,7 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
 
     if ( ellapsed_seconds > 1.0f ) {
         numchars = snprintf(buffer, 20, "%.2f fps", ellapsed_frames / ellapsed_seconds);
-    
+
         old_seconds = seconds;
         ellapsed_frames = 0;
     }
@@ -2098,7 +2098,7 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
     float charwidth = TextRendering_CharWidth(window);
 
     TextRendering_PrintString(window, buffer, 1.0f-(numchars + 1)*charwidth, 1.0f-lineheight, 1.0f);
-    
+
     // Mostra a força da tacada atual de forma visual
     if (g_ShowInfoText && !g_BolaNoBuraco) {
         if (!g_EspacoPressionado && g_TempoRotacaoTaco < 0.0) {
@@ -2399,7 +2399,7 @@ void MenuInit()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     g_LogoTextureID = LoadTextureImageRGBA("../../GOLFinho-removebg-preview.png", &g_LogoWidth, &g_LogoHeight);
-    
+
     // Bind to unit 8 for the flag shader
     glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_2D, g_LogoTextureID);
@@ -2705,11 +2705,11 @@ void MenuRenderOverlay(GLFWwindow* window)
     } else if (g_CurrentState == MENU_LEVEL_COMPLETE) {
         float btnW = 0.5f;
         float btnH = 0.08f;
-        
+
         glUseProgram(textprogram_id);
         glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
         TextRendering_PrintString(window, "Nivel Completo!", -0.3f, 0.5f, 1.8f);
-        
+
         char buffer[100];
         if (g_MultiplayerAtivo) {
             int winner = (g_TacadasPlayer1 < g_TacadasPlayer2) ? 1 : (g_TacadasPlayer2 < g_TacadasPlayer1) ? 2 : 0;
@@ -2717,40 +2717,40 @@ void MenuRenderOverlay(GLFWwindow* window)
             else if (winner == 2) sprintf(buffer, "Player 2 Venceu!");
             else sprintf(buffer, "Empate!");
             TextRendering_PrintString(window, buffer, -0.2f, 0.35f, 1.2f);
-            
+
             sprintf(buffer, "Player 1: %d tacadas", g_TacadasPlayer1);
             TextRendering_PrintString(window, buffer, -0.3f, 0.25f, 1.0f);
-            
+
             sprintf(buffer, "Player 2: %d tacadas", g_TacadasPlayer2);
             TextRendering_PrintString(window, buffer, -0.3f, 0.15f, 1.0f);
         } else {
             sprintf(buffer, "Tacadas: %d", g_TacadasPlayer1);
             TextRendering_PrintString(window, buffer, -0.15f, 0.3f, 1.2f);
         }
-        
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        g_HoverProxPista = RenderButton(window, 0.0f, -0.05f, btnW, btnH, 
+
+        g_HoverProxPista = RenderButton(window, 0.0f, -0.05f, btnW, btnH,
                                         g_nivelAtual < 3 ? "Proxima Pista" : "Finalizar",
                                         0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
-                                        
+
         g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.25f, btnW, btnH, "Menu Principal",
                                         0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
     } else if (g_CurrentState == MENU_PAUSE) {
         float btnW = 0.5f;
         float btnH = 0.08f;
-        
+
         glUseProgram(textprogram_id);
         glUniform3f(glGetUniformLocation(textprogram_id, "textColor"), 1.0f, 1.0f, 1.0f);
         TextRendering_PrintString(window, "JOGO PAUSADO", -0.25f, 0.3f, 1.8f);
-        
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
+
         g_HoverContinuar = RenderButton(window, 0.0f, 0.05f, btnW, btnH, "Continuar",
                                         0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
-                                        
+
         g_HoverSairPause = RenderButton(window, 0.0f, -0.2f, btnW, btnH, "Sair para o Menu",
                                         0.8f, 0.3f, 0.3f, 0.7f, 0.2f, 0.2f, true);
     }
@@ -2833,8 +2833,8 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
     model = Matrix_Translate(hp.x + 0.3f, hp.y, hp.z) * Matrix_Scale(0.1f, 0.1f, 0.1f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
     glUniform1i(g_object_id_uniform, MASTRO);
-    DrawVirtualObject("Bandeira_Mastro"); 
-    
+    DrawVirtualObject("Bandeira_Mastro");
+
     glDisable(GL_CULL_FACE);
     glUniform1i(g_object_id_uniform, BANDEIRA);
     DrawVirtualObject("Blandeira");
@@ -2945,7 +2945,7 @@ void MenuHandleClick(GLFWwindow* window)
                     g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
                     g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
                 }
-                
+
                 break;
             }
         }
@@ -2964,7 +2964,7 @@ void MenuHandleClick(GLFWwindow* window)
             float sliderRight = 0.15f + 0.30f;
             float newVal = (ndcX - sliderLeft) / (sliderRight - sliderLeft);
             newVal = std::max(0.0f, std::min(1.0f, newVal));
-            
+
             if (ndcY > 0.50f) { // Music slider
                 g_MusicVolume = newVal;
                 if (g_audioInitialized) ma_sound_set_volume(&g_musicMenu, g_MusicVolume);
@@ -3083,12 +3083,12 @@ static void ApplyTrackCollision(glm::vec3& pos, glm::vec3& vel,
     const float B = BALL_RADIUS;
     bool hit = false;
     float impact_vel = 0.0f;
-    
+
     if (pos.x > max_x - B) { pos.x = max_x - B; impact_vel = std::max(impact_vel, std::abs(vel.x)); vel.x *= -0.5f; hit = true; }
     if (pos.x < min_x + B) { pos.x = min_x + B; impact_vel = std::max(impact_vel, std::abs(vel.x)); vel.x *= -0.5f; hit = true; }
     if (pos.z > max_z - B) { pos.z = max_z - B; impact_vel = std::max(impact_vel, std::abs(vel.z)); vel.z *= -0.5f; hit = true; }
     if (pos.z < min_z + B) { pos.z = min_z + B; impact_vel = std::max(impact_vel, std::abs(vel.z)); vel.z *= -0.5f; hit = true; }
-    
+
     if (hit && g_audioInitialized && impact_vel > 0.5f) {
         ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
         ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
@@ -3101,7 +3101,7 @@ static void ApplyTrackCollision(glm::vec3& pos, glm::vec3& vel,
  * Calculates the closest point on a 3D triangle to a given coordinate.
  * Uses Voronoi region separation to evaluate the closest geometric feature (vertex, edge, or face)
  * to maintain strict constraints for non-planar surface traversal.
- * 
+ *
  * @param p The target spatial coordinate.
  * @param a Triangle vertex 0.
  * @param b Triangle vertex 1.
@@ -3113,41 +3113,41 @@ static glm::vec3 ClosestPointOnTriangle(const glm::vec3& p, const glm::vec3& a, 
     glm::vec3 ab = b - a;
     glm::vec3 ac = c - a;
     glm::vec3 ap = p - a;
-    
+
     out_normal = glm::normalize(glm::cross(ab, ac));
-    
+
     float d1 = glm::dot(ab, ap);
     float d2 = glm::dot(ac, ap);
     if (d1 <= 0.0f && d2 <= 0.0f) return a;
-    
+
     glm::vec3 bp = p - b;
     float d3 = glm::dot(ab, bp);
     float d4 = glm::dot(ac, bp);
     if (d3 >= 0.0f && d4 <= d3) return b;
-    
+
     float vc = d1*d4 - d3*d2;
     if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
         float v = d1 / (d1 - d3);
         return a + v * ab;
     }
-    
+
     glm::vec3 cp = p - c;
     float d5 = glm::dot(ab, cp);
     float d6 = glm::dot(ac, cp);
     if (d6 >= 0.0f && d5 <= d6) return c;
-    
+
     float vb = d5*d2 - d1*d6;
     if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
         float w = d2 / (d2 - d6);
         return a + w * ac;
     }
-    
+
     float va = d3*d6 - d5*d4;
     if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
         float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
         return b + w * (c - b);
     }
-    
+
     float denom = 1.0f / (va + vb + vc);
     float v = vb * denom;
     float w = vc * denom;
@@ -3158,7 +3158,7 @@ static glm::vec3 ClosestPointOnTriangle(const glm::vec3& p, const glm::vec3& a, 
  * Executes sub-stepped physics integration for Level 3 (Loop Track).
  * Dynamically switches between planar raycast constraints and universal 3D mesh collisions
  * to allow navigation through complex topologies without predefined waypoints.
- * 
+ *
  * @param pos Current positional vector of the ball.
  * @param vel Current velocity vector of the ball.
  * @param no_caminho Deprecated waypoint state flag (maintained for signature compatibility).
@@ -3176,7 +3176,7 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
 
     for (int i = 0; i < N; i++) {
         vel.y -= GRAVITY * sub;
-        
+
         glm::vec3 next_pos = pos + vel * sub;
 
         if (!g_PistaLoopAllTriangles.empty()) {
@@ -3192,13 +3192,13 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
 
                 glm::vec3 n;
                 glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
-                
+
                 // BACKFACE CULLING: Evita colar por baixo do chão na base do loop
                 if (pos.y < 1.0f && n.y < -0.05f) continue;
 
                 glm::vec3 diff = next_pos - cp;
                 float dist2 = glm::dot(diff, diff);
-                
+
                 if (dist2 < min_dist2 && dist2 < 0.25f) {
                     min_dist2 = dist2;
                     best_p = cp;
@@ -3224,20 +3224,20 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                         }
                     }
                 }
-                
+
                 pos = best_p + best_n * BALL_RADIUS;
 
                 float vel_normal = glm::dot(vel, best_n);
                 if (vel_normal < 0.0f) {
                     vel -= best_n * vel_normal;
                 }
-                
+
                 vel -= vel * LOOP_FRICTION * sub;
-                
+
                 float speed = glm::length(vel);
                 if (best_n.y < 0.5f && speed < 1.5f && pos.y > 0.5f) {
                     vel.y -= GRAVITY * sub * 2.0f;
-                    pos = next_pos; 
+                    pos = next_pos;
                     fallback_to_planar = true;
                 }
             } else {
@@ -3283,12 +3283,12 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                     }
                 }
 
-                vel.x -= vel.x * 0.9f * sub; 
+                vel.x -= vel.x * 0.9f * sub;
                 vel.z -= vel.z * 0.9f * sub;
                 if (glm::length(glm::vec3(vel.x, 0.0f, vel.z)) < 0.05f) { vel.x = 0.0f; vel.z = 0.0f; }
 
                 pos = next_pos;
-                
+
                 float sY = RaycastTrackHeight(g_PistaLoopTriangles, pos.x, pos.y + 2.0f, pos.z, -1e9f);
                 if (sY < -1e8f && !g_PistaLoopTriangles.empty()) {
                     float min_d2 = 1e9f;
@@ -3299,7 +3299,7 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
                         if (d2 < min_d2) { min_d2 = d2; sY = cp.y; }
                     }
                 }
-                
+
                 if (sY > -1e8f && pos.y <= sY + BALL_RADIUS) {
                     pos.y = sY + BALL_RADIUS;
                     if (vel.y < 0.0f) vel.y = 0.0f;
@@ -3307,7 +3307,7 @@ static void AtualizarFisicaLoop(glm::vec3& pos, glm::vec3& vel,
             }
         }
     }
-    
+
     float d = glm::length(vel * dt);
     if (d > 1e-4f) {
         glm::vec4 ax(vel.z, 0, -vel.x, 0);
@@ -3347,7 +3347,7 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
     for (int i = 0; i < N; i++) {
         vel.y -= GRAVITY * sub;
         glm::vec3 next_pos = pos + vel * sub;
-        
+
         // Planar boundary containment (Invisible Walls)
         // Elevado para +2.0f para ignorar problemas de tunneling
         float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
@@ -3375,11 +3375,11 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                     glm::vec2 wall_normal = diff / dist;
                     glm::vec2 vel_xz(vel.x, vel.z);
                     float vel_into_wall = glm::dot(vel_xz, wall_normal);
-                    
+
                     if (vel_into_wall > 0.0f) {
                         vel.x -= wall_normal.x * vel_into_wall * 1.5f;
                         vel.z -= wall_normal.y * vel_into_wall * 1.5f;
-                        
+
                         if (g_audioInitialized && vel_into_wall > 0.5f) {
                             ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
                             ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
@@ -3396,7 +3396,7 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
 
         // Perfect floor following with gap filler!
         float sY = RaycastTrackHeight(floorTriangles, pos.x, pos.y + 2.0f, pos.z, -1e9f);
-        
+
         if (sY < -1e8f && !floorTriangles.empty()) {
             float min_d2 = 1e9f;
             for (const auto& tri : floorTriangles) {
@@ -3427,7 +3427,7 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
 
         if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
     }
-    
+
     // Rotação visual
     float d = glm::length(vel * dt);
     if (d > 1e-4f) {
@@ -3440,18 +3440,18 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
 void AtualizarFisicaBola(float delta_time) {
     glm::vec2 diff = glm::vec2(g_PosBola.x - g_HolePosition.x, g_PosBola.z - g_HolePosition.z);
     float distToHole = glm::length(diff);
-    
+
     if (distToHole < 0.11f && g_PosBola.y <= g_HolePosition.y + 0.10f) {
         // Snap to center and kill horizontal velocity so it can't escape
         g_PosBola.x = g_HolePosition.x;
         g_PosBola.z = g_HolePosition.z;
         g_VelocidadeBola.x = 0.0f;
         g_VelocidadeBola.z = 0.0f;
-        
+
         // Freefall perfectly straight down
         g_VelocidadeBola.y -= 9.8f * delta_time;
         g_PosBola.y += g_VelocidadeBola.y * delta_time;
-        
+
         // Stop exactly at the bottom and end level instantly
         float bottom_y = g_HolePosition.y - 0.10f;
         if (g_PosBola.y <= bottom_y + BALL_RADIUS) {
@@ -3491,18 +3491,18 @@ void AtualizarFisicaBola(float delta_time) {
 void AtualizarFisicaBolaTwo(float delta_time) {
     glm::vec2 diff = glm::vec2(g_PosBolaTwo.x - g_HolePosition.x, g_PosBolaTwo.z - g_HolePosition.z);
     float distToHole = glm::length(diff);
-    
+
     if (distToHole < 0.11f && g_PosBolaTwo.y <= g_HolePosition.y + 0.10f) {
         // Snap to center and kill horizontal velocity so it can't escape
         g_PosBolaTwo.x = g_HolePosition.x;
         g_PosBolaTwo.z = g_HolePosition.z;
         g_VelocidadeBolaTwo.x = 0.0f;
         g_VelocidadeBolaTwo.z = 0.0f;
-        
+
         // Freefall perfectly straight down
         g_VelocidadeBolaTwo.y -= 9.8f * delta_time;
         g_PosBolaTwo.y += g_VelocidadeBolaTwo.y * delta_time;
-        
+
         // Stop exactly at the bottom and end level instantly
         float bottom_y = g_HolePosition.y - 0.10f;
         if (g_PosBolaTwo.y <= bottom_y + BALL_RADIUS) {
@@ -3571,7 +3571,7 @@ static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
 
         glm::vec3 e1 = tri.v1 - tri.v0;
         glm::vec3 e2 = tri.v2 - tri.v0;
-        
+
         glm::vec3 h = glm::cross(dir, e2);
         float a = glm::dot(e1, h);
         if (fabs(a) < 1e-7f) continue; // Paralelo
@@ -3604,9 +3604,9 @@ void AtualizarCamera(){
             g_CameraDistance = 1.0f;
             float camera_height = 0.35f;
             glm::vec4 camera_position_c  = glm::vec4( g_PosBola.x + cos(g_TacoRotacao) * g_CameraDistance, g_PosBola.y + camera_height, g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance, 1.0f );
-            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
-            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; 
-            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
+            glm::vec4 camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f);
 
             if(!g_JogadorAtual){
                 camera_position_c  = glm::vec4(
@@ -3615,8 +3615,8 @@ void AtualizarCamera(){
                     g_PosBola.z + sin(g_TacoRotacao) * g_CameraDistance,
                     1.0f
                 );
-                camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f); 
-                camera_view_vector = camera_lookat_l - camera_position_c; 
+                camera_lookat_l    = glm::vec4(g_PosBola.x, g_PosBola.y, g_PosBola.z, 1.0f);
+                camera_view_vector = camera_lookat_l - camera_position_c;
             } else if(g_JogadorAtual){
                 camera_position_c  = glm::vec4(
                     g_PosBolaTwo.x + cos(g_TacoRotacao) * g_CameraDistance,
@@ -3624,9 +3624,9 @@ void AtualizarCamera(){
                     g_PosBolaTwo.z + sin(g_TacoRotacao) * g_CameraDistance,
                     1.0f
                 );
-                camera_lookat_l    = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f); 
-                camera_view_vector = camera_lookat_l - camera_position_c; 
-                camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); 
+                camera_lookat_l    = glm::vec4(g_PosBolaTwo.x, g_PosBolaTwo.y, g_PosBolaTwo.z, 1.0f);
+                camera_view_vector = camera_lookat_l - camera_position_c;
+                camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f);
             }
             // Computamos a matriz "View" utilizando os parâmetros da câmera para
             // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
@@ -3634,7 +3634,7 @@ void AtualizarCamera(){
         }
         else{
             if(!g_JogadorAtual){
-            
+
                 g_CameraDistance = 1.0f;
 
                 // Coordenadas esféricas
