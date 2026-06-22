@@ -98,9 +98,8 @@ void TextRendering_PrintMatrixVectorProductDivW(GLFWwindow* window, glm::mat4 M,
 
 // Funções abaixo renderizam como texto na janela OpenGL algumas matrizes e
 // outras informações do programa. Definidas após main().
-void TextRendering_ShowModelViewProjection(GLFWwindow* window, glm::mat4 projection, glm::mat4 view, glm::mat4 model, glm::vec4 p_model);
-void TextRendering_ShowEulerAngles(GLFWwindow* window);
 void TextRendering_ShowProjection(GLFWwindow* window);
+void TextRendering_ShowModelViewProjection(GLFWwindow* window, glm::mat4 projection, glm::mat4 view, glm::mat4 model, glm::vec4 p_model);
 void TextRendering_ShowFramesPerSecond(GLFWwindow* window);
 
 // Funções callback para comunicação com o sistema operacional e interação do
@@ -270,10 +269,15 @@ int main(int argc, char* argv[])
     ComputeNormals(&bandeiramodel);
     BuildTrianglesAndAddToVirtualScene(&bandeiramodel);
 
-    // Construímos a Pista cCurva
+    // Construímos a Pista curva
     ObjModel PistaCurvamodel("../../data/PistaCurva.obj");
     ComputeNormals(&PistaCurvamodel);
     BuildTrianglesAndAddToVirtualScene(&PistaCurvamodel);
+
+    // Construímos a Pista simples
+    ObjModel PistaSimplesmodel("../../data/PistaSimples.obj");
+    ComputeNormals(&PistaSimplesmodel);
+    BuildTrianglesAndAddToVirtualScene(&PistaSimplesmodel);
 
     // Extrair triângulos da PistaCurva para heightmap (world space: scale=0.25, Y offset=0.064)
     ObjModel Zeppelinmodel("../../data/zeppelin.obj");
@@ -319,8 +323,8 @@ int main(int argc, char* argv[])
         printf("PistaCurva: %zu triângulos de chão extraídos para heightmap.\n", g_PistaCurvaTriangles.size());
     }
 
-    // Extrair triângulos da PistaLoop para heightmap (world space: scale=1.0, Y offset=1.12)
-    // APENAS triângulos com normal apontando pra cima (chão da pista)
+    // Extrair triângulos da PistaLoop para heightmap 
+    // triângulos com normal apontando pra cima
     {
         const auto& attrib = PistaLoopmodel.attrib;
         float scale = 1.0f;
@@ -635,35 +639,17 @@ int main(int argc, char* argv[])
 
         // Pista base (planos) — apenas no nível 1
         if (g_nivelAtual == 1) {
-            // Chão da pista
-            model = Matrix_Translate(0.0f,0.0f,0.0f) * Matrix_Scale(2.0f, 1.0f, 5.0f);
+            // Pista Simples Chão
+            model =Matrix_Translate(0.6f, 0.0f, -0.36f) * Matrix_Scale(0.991f, 0.991f, 0.991f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, PISTA_CHAO);
-            DrawVirtualObject("the_plane");
+            glUniform1i(g_object_id_uniform, PISTASIMPLES);
+            DrawVirtualObject("PistaSimples");
 
-            // Parede Esquerda
-            model = Matrix_Translate(2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
+            //pista simples parede
+            model = Matrix_Translate(0.6f, 0.0f, -0.36f) * Matrix_Scale(0.991f, 0.991f, 0.991f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-            DrawVirtualObject("the_plane");
-
-            // Parede Direita
-            model = Matrix_Translate(-2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
-            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-            DrawVirtualObject("the_plane");
-
-            // Parede Fundo
-            model = Matrix_Translate(0.0f, 0.1f, 5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
-            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-            DrawVirtualObject("the_plane");
-
-            // Parede Frente
-            model = Matrix_Translate(0.0f, 0.1f, -5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
-            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-            DrawVirtualObject("the_plane");
+            glUniform1i(g_object_id_uniform, BORDASSIMPLES);
+            DrawVirtualObject("PistaSimples_bordas");
         }
 
         // Reativamos o Culling para os objetos 3D normais
@@ -721,7 +707,7 @@ int main(int argc, char* argv[])
         // Passa a posição do buraco para o shader para descartar os fragmentos da pista e criar o buraco físico
         glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), g_HolePosition.x, g_HolePosition.y, g_HolePosition.z);
 
-        // Montanha de grama que sobe para abraçar o buraco por fora (esconde a protuberância)
+        // Montanha de grama que sobe para abraçar o buraco por fora 
         if (g_nivelAtual == 2 || g_nivelAtual == 3) {
             model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y - 0.15f, g_HolePosition.z) * Matrix_Scale(0.6f, 0.14f, 0.6f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
@@ -729,7 +715,7 @@ int main(int argc, char* argv[])
             DrawVirtualObject("the_sphere");
         }
 
-        // Buraco (Copo de esfera invertida)
+        // Buraco 
         glEnable(GL_CULL_FACE); // Permitir ver a parte de dentro da esfera mas esconder o fundo de fora
         glCullFace(GL_FRONT);
         model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y + 0.01f, g_HolePosition.z) * Matrix_Scale(0.12f, 0.12f, 0.12f);
@@ -753,7 +739,7 @@ int main(int argc, char* argv[])
             else draw_club = (glm::length(g_VelocidadeBolaTwo) < 0.02f && !g_BolaNoBuracoTwo);
         }
 
-        // O taco só é desenhado se a bola estiver (quase) parada e não estiver no buraco
+        // O taco só é desenhado se a bola estiver parada e não estiver no buraco
         if (draw_club) {
             if(!g_JogadorAtual){
                 model = CalcularTaco(g_PosBola, g_PosTaco, g_DistanciaTaco);
@@ -973,9 +959,6 @@ int main(int argc, char* argv[])
         glUseProgram(g_GpuProgramID);
         glUniform3f( glGetUniformLocation(g_GpuProgramID, "g_PosLuz"), g_PosLuz.x, g_PosLuz.y, g_PosLuz.z );
 
-        // Imprimimos na tela os ângulos de Euler que controlam a rotação do
-        // terceiro cubo.
-        TextRendering_ShowEulerAngles(window);
 
         // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
         TextRendering_ShowProjection(window);
@@ -1945,30 +1928,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         }
     }
 
-    // Se o usuário apertar a tecla backspace, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
-        g_AngleX = 0.0f;
-        g_AngleY = 0.0f;
-        g_AngleZ = 0.0f;
-        g_ForearmAngleX = 0.0f;
-        g_ForearmAngleZ = 0.0f;
-        g_TorsoPositionX = 0.0f;
-        g_TorsoPositionY = 0.0f;
-        g_TacoRotacao = 0.0f;
-        g_TacoRotacaoVertical = 0.0f;
-    }
-
-        // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
-    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-        g_UsePerspectiveProjection = true;
-    }
-
-    // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
-    if (key == GLFW_KEY_O && action == GLFW_PRESS) {
-        g_UsePerspectiveProjection = false;
-    }
-
-
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS) {
         g_ShowInfoText = !g_ShowInfoText;
@@ -2043,20 +2002,6 @@ void TextRendering_ShowModelViewProjection(
     TextRendering_PrintMatrixVectorProductMoreDigits(window, viewport_mapping, p_ndc, -1.0f, 1.0f-26*pad, 1.0f);
 }
 
-// Escrevemos na tela os ângulos de Euler definidos nas variáveis globais
-// g_AngleX, g_AngleY, e g_AngleZ.
-void TextRendering_ShowEulerAngles(GLFWwindow* window)
-{
-    if ( !g_ShowInfoText )
-        return;
-
-    float pad = TextRendering_LineHeight(window);
-
-    char buffer[80];
-   //  snprintf(buffer, 80, "Euler Angles rotation matrix = Z(%.2f)*Y(%.2f)*X(%.2f)\n", g_AngleZ, g_AngleY, g_AngleX);
-
-    TextRendering_PrintString(window, buffer, -1.0f+pad/10, -1.0f+2*pad/10, 1.0f);
-}
 
 // Escrevemos na tela qual matriz de projeção está sendo utilizada.
 void TextRendering_ShowProjection(GLFWwindow* window)
@@ -2792,28 +2737,17 @@ void MenuUpdate(GLFWwindow* window, float delta_time)
     DrawVirtualObject("the_plane");
 
     // Chão da pista
-    model = Matrix_Translate(0.0f,0.0f,0.0f) * Matrix_Scale(2.0f, 1.0f, 5.0f);
+    model = Matrix_Translate(0.0f,0.0f,0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, PISTA_CHAO);
-    DrawVirtualObject("the_plane");
+    glUniform1i(g_object_id_uniform, PISTASIMPLES);
+    DrawVirtualObject("PistaSimples");
 
     // Paredes
-    model = Matrix_Translate(2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
+    model = Matrix_Translate(0.0f, 0.0f, 0.0f) * Matrix_Scale(1.0f, 1.0f, 1.0f);
     glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-    DrawVirtualObject("the_plane");
-    model = Matrix_Translate(-2.0f, 0.1f, 0.0f) * Matrix_Rotate_Z(M_PI/2.0f) * Matrix_Scale(0.1f, 1.0f, 5.0f);
-    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-    DrawVirtualObject("the_plane");
-    model = Matrix_Translate(0.0f, 0.1f, 5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
-    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-    DrawVirtualObject("the_plane");
-    model = Matrix_Translate(0.0f, 0.1f, -5.0f) * Matrix_Rotate_X(M_PI/2.0f) * Matrix_Scale(2.0f, 1.0f, 0.1f);
-    glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(g_object_id_uniform, PISTA_PAREDE);
-    DrawVirtualObject("the_plane");
+    glUniform1i(g_object_id_uniform, BORDASSIMPLES);
+    DrawVirtualObject("PistaSimples_bordas");
+    
 
     glEnable(GL_CULL_FACE);
 
@@ -2931,9 +2865,9 @@ void MenuHandleClick(GLFWwindow* window)
 
                 // Posições dependem do nível (coordenadas verificadas via análise do mesh)
                 if (g_nivelAtual == 1) {
-                    g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
-                    g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -3.0f);
-                    g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
+                    g_PosBola = glm::vec3(0.0f, 0.025f, -4.3f);
+                    g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -4.3f);
+                    g_HolePosition = glm::vec3(0.0f, 0.0f, 3.8f);
                 } else if (g_nivelAtual == 2) {
                     // PistaCurva: spawn no centro da seção larga, hole no final
                     g_PosBola = glm::vec3(3.0f, 0.1f, -1.0f);
@@ -3040,7 +2974,7 @@ static float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
                                 float x, float current_y, float z, float fallbackY);
 
 // =============================================
-// CONSTANTES DO LOOP — Rail Physics (world space)
+// CONSTANTES DO LOOP — Rail Physics 
 // =============================================
 // Geometria analítica do loop cilíndrico, extraída da análise do mesh PistaLoop.obj.
 // O loop é um círculo vertical no plano YZ, centrado em LOOP_CENTER, com raio LOOP_RADIUS.
@@ -3049,7 +2983,7 @@ static const float LOOP_CENTER_X  = 2.202f;   // Posição lateral (travada enqu
 static const float LOOP_CENTER_Y  = 1.196f;   // Centro vertical do loop
 static const float LOOP_CENTER_Z  = -0.13f;   // Centro em profundidade
 static const float LOOP_RADIUS    = 1.03f;    // Raio do círculo
-static const float GRAVITY        = 9.81f;    // Gravidade realista (m/s²)
+static const float GRAVITY        = 9.81f;    // Gravidade realista (m/s²) <---- Essa merda é literalmente magia negra
 static const float BALL_RADIUS    = 0.025f;
 static const float LOOP_FRICTION  = 0.02f;    // Atrito leve no rail para estabilidade
 

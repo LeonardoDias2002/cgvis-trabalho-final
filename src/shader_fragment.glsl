@@ -292,34 +292,7 @@ void main()
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
-    else if ( object_id == PISTA_CHAO )
-    {
-        vec2 d = position_world.xz - u_HolePosition.xz;
-        if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
-        vec4 world_pos = model * position_model;
-        U = world_pos.x * 2.0;
-        V = world_pos.z * 2.0;
-        if (u_TexturaGramaPista == 0)
-            Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // terreno rochoso (padrao)
-        else if (u_TexturaGramaPista == 1)
-            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo vermelho
-        else if (u_TexturaGramaPista == 2)
-            Kd0 = texture(TextureImage6, vec2(U,V)).rgb; // track.jpg
-        else
-            Kd0 = vec3(0.2, 0.7, 0.2); // verde solido
-    }
-    else if ( object_id == PISTA_PAREDE )
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        if (u_TexturaParedesPista == 0)
-            Kd0 = texture(TextureImage1, vec2(U,V)).rgb; // terreno rochoso (padrao)
-        else if (u_TexturaParedesPista == 1)
-            Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // tijolo vermelho
-        else
-            Kd0 = vec3(0.5, 0.5, 0.5); // cinza solido
-    }
-    else if ( object_id == PISTALOOP || object_id == PISTACURVA )
+    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES )
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
@@ -347,7 +320,7 @@ void main()
         else
             Kd0 = vec3(0.2, 0.7, 0.2);
     }
-    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP )
+    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP ||  object_id == BORDASSIMPLES)
     {
         vec4 world_pos = position_world;
         
