@@ -75,7 +75,7 @@ uniform sampler2D TextureImage5; // Grama (grass.jpg)
 uniform sampler2D TextureImage6; // Track (track.jpg)
 uniform sampler2D TextureImage7; // Zeppelin metal
 uniform sampler2D TextureImage8; // Logo (GOLFinho)
-uniform sampler2D TextureImage9; // paredes padrão
+uniform sampler2D TextureImage9; // paredes.png
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
 

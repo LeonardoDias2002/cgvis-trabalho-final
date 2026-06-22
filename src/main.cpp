@@ -1140,8 +1140,8 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage9"), 9);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 9);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage9"), 8);
     glUseProgram(0);
 }
 
@@ -2347,8 +2347,8 @@ void MenuInit()
     glBindVertexArray(0);
     g_LogoTextureID = LoadTextureImageRGBA("../../GOLFinho-removebg-preview.png", &g_LogoWidth, &g_LogoHeight);
 
-    // Bind to unit 8 for the flag shader
-    glActiveTexture(GL_TEXTURE8);
+    // Bind to unit 9 for the flag shader
+    glActiveTexture(GL_TEXTURE9);
     glBindTexture(GL_TEXTURE_2D, g_LogoTextureID);
     glActiveTexture(GL_TEXTURE0);
 }
