@@ -150,16 +150,14 @@ struct SceneObject
 #define TRONCO 23
 #define ZEPPELIN 24
 #define PISTAQUATRO 25
-#define PISTAQUATRO2 26 
-#define BORDASQUATRO 27
-#define BORDASQUATRO2 28
-#define ESPINHOS 29
-#define SQZO 30
-#define PISTAQUATRO3 31
+#define BORDASQUATRO 26
+#define ESPINHOS 27
+#define PISTASPIRAL 28
+#define BORDASSPIRAL 29
+
 // =============================================
 // ENUM DE ESTADO DO JOGO
 // =============================================
-
 
 enum GameState { MENU_MAIN, MENU_LEVELS, MENU_SETTINGS, PLAYING, MENU_LEVEL_COMPLETE, MENU_PAUSE };
 

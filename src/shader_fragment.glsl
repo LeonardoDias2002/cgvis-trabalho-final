@@ -48,10 +48,10 @@ uniform mat4 projection;
 #define BORDASLOOP 22
 #define ZEPPELIN 24
 #define PISTAQUATRO 25
-#define PISTAQUATRO2 26
-#define BORDASQUATRO 27
-#define BORDASQUATRO2 28
-#define SQZO 30
+#define BORDASQUATRO 26
+#define ESPINHOS 27
+#define PISTASPIRAL 28
+#define BORDASSPIRAL 29
 
 
 uniform int object_id;
@@ -272,7 +272,7 @@ void main()
         float lv = texcoords.y * 4.0 - 1.5;
 
         if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0) {
-            vec4 logo = texture(TextureImage8, vec2(1.0 - lv, 1.0 - lu));
+            vec4 logo = texture(TextureImage7, vec2(1.0 - lv, 1.0 - lu));
             zeppelinColor = mix(zeppelinColor, logo.rgb, logo.a);
         }
 
@@ -298,7 +298,7 @@ void main()
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
-    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES || object_id == PISTAQUATRO || object_id == PISTAQUATRO2 || object_id == SQZO )
+    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES || object_id == PISTAQUATRO || object_id == PISTASPIRAL)
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
@@ -326,7 +326,7 @@ void main()
         else
             Kd0 = vec3(0.2, 0.7, 0.2);
     }
-    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP ||  object_id == BORDASSIMPLES || object_id == BORDASQUATRO || object_id == BORDASQUATRO2 )
+    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP ||  object_id == BORDASSIMPLES || object_id == BORDASQUATRO || object_id == BORDASSPIRAL)
     {
         vec4 world_pos = position_world;
         
@@ -373,12 +373,6 @@ void main()
         V = world_pos.y * 0.5;
         vec3 texture_color = texture(TextureImage4, vec2(U,V)).rgb;
         Kd0 = texture_color;
-        Ks = vec3(0.0, 0.0, 0.0);
-        q = 1.0;
-    }
-    else if ( object_id == CACTUS )
-    {
-        Kd0 = vec3(0.2, 0.55, 0.15); // verde cactus
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
