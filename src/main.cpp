@@ -284,6 +284,12 @@ int main(int argc, char* argv[])
     ObjModel Zeppelinmodel("../../data/zeppelin.obj");
     ComputeNormals(&Zeppelinmodel);
     BuildTrianglesAndAddToVirtualScene(&Zeppelinmodel);
+
+    // Extrair triângulos da PistaCurva para heightmap (world space: scale=0.25, Y offset=0.064)
+    ObjModel PistaQuatromodel("../../data/PistaQuatro.obj");
+    ComputeNormals(&PistaQuatromodel);
+    BuildTrianglesAndAddToVirtualScene(&PistaQuatromodel);
+
     // APENAS triângulos com normal apontando pra cima (chão), excluindo paredes e teto
     {
         const auto& attrib = PistaCurvamodel.attrib;
@@ -364,6 +370,48 @@ int main(int argc, char* argv[])
             }
         }
         printf("PistaLoop: %zu triângulos de chão extraídos para heightmap.\n", g_PistaLoopTriangles.size());
+    }
+
+    // Extrair triângulos da PistaQuatro para heightmap com a mesma transformação usada na renderização
+    {
+        const auto& attrib = PistaQuatromodel.attrib;
+        float scale = 0.85f;
+        float x_off = -8.0f;
+        float y_off = 0.0f;
+        float z_off = 0.0f;
+        for (const auto& shape : PistaQuatromodel.shapes) {
+            size_t idx_offset = 0;
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                int fv = shape.mesh.num_face_vertices[f];
+                if (fv >= 3) {
+                    glm::vec3 v0(
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+0]*scale + x_off,
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+1]*scale + y_off,
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+2]*scale + z_off);
+                    for (int t = 1; t < fv - 1; t++) {
+                        glm::vec3 v1(
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+0]*scale + x_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+1]*scale + y_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+2]*scale + z_off);
+                        glm::vec3 v2(
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+0]*scale + x_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+1]*scale + y_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+2]*scale + z_off);
+                        glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
+                        float len = glm::length(normal);
+                        bool isBorda = (shape.name.find("bordas") != std::string::npos || shape.name.find("Bordas") != std::string::npos);
+                        if (!isBorda && len > 1e-7f) {
+                            g_PistaQuatroAllTriangles.push_back({v0, v1, v2});
+                            if ((normal.y / len) > 0.3f) {
+                                g_PistaQuatroTriangles.push_back({v0, v1, v2});
+                            }
+                        }
+                    }
+                }
+                idx_offset += fv;
+            }
+        }
+        printf("PistaQuatro: %zu triângulos de chão extraídos para heightmap.\n", g_PistaQuatroTriangles.size());
     }
 
         // Caminho do Loop (Path Following Waypoints)
@@ -674,6 +722,7 @@ int main(int argc, char* argv[])
                 float ray_y = g_PosBola.y;
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
+                else if (g_nivelAtual == 4) ray_y = RaycastTrackHeight(g_PistaQuatroTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
 
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -697,6 +746,7 @@ int main(int argc, char* argv[])
                 float ray_y = g_PosBolaTwo.y;
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
+                else if (g_nivelAtual == 4) ray_y = RaycastTrackHeight(g_PistaQuatroTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
 
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -816,6 +866,47 @@ int main(int argc, char* argv[])
             DrawVirtualObject("bordas_loop");
         }
 
+        // Nível 4: Pista Quatro
+        if (g_nivelAtual == 4) {
+            glEnable(GL_CULL_FACE);
+
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTAQUATRO);
+            DrawVirtualObject("PistaQuatro_Parte1");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BORDASQUATRO);
+            DrawVirtualObject("PistaQuatro_Parte1Bordas");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTAQUATRO2);
+            DrawVirtualObject("PistaQuatro_Parte2");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BORDASQUATRO2);
+            DrawVirtualObject("PistaQuatro_Parte2Bordas");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, SQZO);
+            DrawVirtualObject("Sqq");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTAQUATRO3);
+            DrawVirtualObject("PistaQuatro_Parte3");
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, ESPINHOS);
+            DrawVirtualObject("Espinhos");
+        }
+
         // ==========================================
         // Desenha o Zeppelin Voador com Curva de Bézier Cúbica (Loop Fechado)
         // ==========================================
@@ -885,7 +976,7 @@ int main(int argc, char* argv[])
             }
         };
 
-        if (g_nivelAtual >= 1 && g_nivelAtual <= 3) {
+        if (g_nivelAtual >= 1 && g_nivelAtual <= 4) {
             // Floresta densa mais proxima da pista
             float cx = 0.0f;
             float cz = 0.0f;
@@ -2486,7 +2577,7 @@ void MenuRenderLevelSelect(GLFWwindow* window)
     float spacing = 0.20f;
     for (int i = 0; i < 5; i++) {
         float bx = startX + i * spacing;
-        bool enabled = (i < 3);
+        bool enabled = (i < 4);
         char label[4];
         snprintf(label, 4, "%d", i + 1);
         RenderButton(window, bx, 0.15f, btnSize, btnSize, label,
@@ -2679,7 +2770,7 @@ void MenuRenderOverlay(GLFWwindow* window)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         g_HoverProxPista = RenderButton(window, 0.0f, -0.05f, btnW, btnH,
-                                        g_nivelAtual < 3 ? "Proxima Pista" : "Finalizar",
+                                        g_nivelAtual < 4 ? "Proxima Pista" : "Finalizar",
                                         0.2f, 0.8f, 0.4f, 0.15f, 0.7f, 0.3f, true);
 
         g_HoverMenuCompleto = RenderButton(window, 0.0f, -0.25f, btnW, btnH, "Menu Principal",
@@ -2830,11 +2921,11 @@ void MenuHandleClick(GLFWwindow* window)
     else if (g_CurrentState == MENU_LEVELS) {
         if (g_HoverVoltar) g_CurrentState = MENU_MAIN;
 
-        // Verifica clique nos botões de nível (3 habilitados)
+        // Verifica clique nos botões de nível (4 habilitados)
         float startX = -0.40f;
         float spacing = 0.20f;
         float btnSize = 0.075f;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             float bx = startX + i * spacing;
             if (IsMouseOverRect(window, bx, 0.15f, btnSize, btnSize)) {
                 g_CurrentState = PLAYING;
@@ -2880,6 +2971,11 @@ void MenuHandleClick(GLFWwindow* window)
                     g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
                     g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
                     g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
+                } else if (g_nivelAtual == 4) {
+                    // PistaQuatro: posições iniciaisis
+                    g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
+                    g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
+                    g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
                 }
 
                 break;
@@ -2968,6 +3064,10 @@ void ProxNivel(GLFWwindow* window) {
         g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
         g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
         g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
+    } else if (g_nivelAtual == 4) {
+        g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
+        g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
+        g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
     }
 }
 
@@ -3418,6 +3518,10 @@ void AtualizarFisicaBola(float delta_time) {
             AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
                                    g_BolaRotationMatrix, delta_time,
                                    g_PistaCurvaAllTriangles, g_PistaCurvaTriangles);
+        else if (g_nivelAtual == 4)
+            AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
+                                   g_BolaRotationMatrix, delta_time,
+                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles);
         else
             AtualizarFisicaSubstep(g_PosBola, g_VelocidadeBola,
                                    g_BolaRotationMatrix, delta_time, g_nivelAtual);
@@ -3469,6 +3573,10 @@ void AtualizarFisicaBolaTwo(float delta_time) {
             AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
                                    g_BolaRotationMatrixTwo, delta_time,
                                    g_PistaCurvaAllTriangles, g_PistaCurvaTriangles);
+        else if (g_nivelAtual == 4)
+            AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
+                                   g_BolaRotationMatrixTwo, delta_time,
+                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles);
         else
             AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
                                    g_BolaRotationMatrixTwo, delta_time, g_nivelAtual);

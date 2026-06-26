@@ -47,6 +47,11 @@ uniform mat4 projection;
 #define BORDASCURVA 21
 #define BORDASLOOP 22
 #define ZEPPELIN 24
+#define PISTAQUATRO 25
+#define PISTAQUATRO2 26
+#define BORDASQUATRO 27
+#define BORDASQUATRO2 28
+#define SQZO 30
 
 
 uniform int object_id;
@@ -293,7 +298,7 @@ void main()
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
-    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES )
+    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES || object_id == PISTAQUATRO || object_id == PISTAQUATRO2 || object_id == SQZO )
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
@@ -321,7 +326,7 @@ void main()
         else
             Kd0 = vec3(0.2, 0.7, 0.2);
     }
-    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP ||  object_id == BORDASSIMPLES)
+    else if ( object_id == BORDASCURVA || object_id == BORDASLOOP ||  object_id == BORDASSIMPLES || object_id == BORDASQUATRO || object_id == BORDASQUATRO2 )
     {
         vec4 world_pos = position_world;
         

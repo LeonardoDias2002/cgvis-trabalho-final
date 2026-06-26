@@ -144,6 +144,8 @@ std::vector<TrackTriangle> g_PistaCurvaTriangles;
 std::vector<TrackTriangle> g_PistaCurvaAllTriangles;
 std::vector<TrackTriangle> g_PistaLoopTriangles;
 std::vector<TrackTriangle> g_PistaLoopAllTriangles;
+std::vector<TrackTriangle> g_PistaQuatroTriangles;
+std::vector<TrackTriangle> g_PistaQuatroAllTriangles;
 
 // ========== SISTEMA DE MENU ==========
 GameState g_CurrentState = MENU_MAIN;

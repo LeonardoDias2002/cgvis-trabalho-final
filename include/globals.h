@@ -149,6 +149,13 @@ struct SceneObject
 #define BORDASLOOP 22
 #define TRONCO 23
 #define ZEPPELIN 24
+#define PISTAQUATRO 25
+#define PISTAQUATRO2 26 
+#define BORDASQUATRO 27
+#define BORDASQUATRO2 28
+#define ESPINHOS 29
+#define SQZO 30
+#define PISTAQUATRO3 31
 // =============================================
 // ENUM DE ESTADO DO JOGO
 // =============================================
@@ -276,6 +283,8 @@ extern std::vector<TrackTriangle> g_PistaCurvaTriangles;
 extern std::vector<TrackTriangle> g_PistaCurvaAllTriangles; // ALL triangles for 3D physics
 extern std::vector<TrackTriangle> g_PistaLoopTriangles;
 extern std::vector<TrackTriangle> g_PistaLoopAllTriangles; // ALL triangles for 3D physics
+extern std::vector<TrackTriangle> g_PistaQuatroTriangles;
+extern std::vector<TrackTriangle> g_PistaQuatroAllTriangles;
 
 // --- Sistema de Menu ---
 extern GameState g_CurrentState;
