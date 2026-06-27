@@ -107,6 +107,13 @@ void main()
     // normais de cada vértice.
     vec3 n = normalize(normal.xyz);
 
+    // Se estivermos vendo a parte de trás do polígono (e culling estiver desativado),
+    // invertemos a normal para que a iluminação (ex: lambert) funcione corretamente.
+    // Isso corrige o problema da "sombra" escura na Pista 4 que tem polígonos invertidos.
+    if (!gl_FrontFacing) {
+        n = -n;
+    }
+
     // Vetor que define o sentido da fonte de luz em relação ao ponto atual.
     vec3 l = normalize(g_PosLuz - p.xyz);
 
