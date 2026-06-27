@@ -3042,7 +3042,7 @@ void MenuHandleClick(GLFWwindow* window)
                 } else if (g_nivelAtual == 4) {
                     // PistaQuatro: posições iniciaisis originais
                     g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
-                    g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
+                    g_PosBolaTwo = glm::vec3(7.5f, 1.625f, 0.2f);
                     g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
                 } else if (g_nivelAtual == 5) {
                     // PistaCinco: posições iniciais (Top of the spiral)
@@ -3139,7 +3139,7 @@ void ProxNivel(GLFWwindow* window) {
         g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
     } else if (g_nivelAtual == 4) {
         g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
-        g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
+        g_PosBolaTwo = glm::vec3(7.5f, 1.625f, 0.2f);
         g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
     } else if (g_nivelAtual == 5) {
         g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
@@ -3722,7 +3722,7 @@ void AtualizarFisicaBolaTwo(float delta_time) {
                                    
         // Lógica de Respawn se cair da pista (Independente para Jogador 2)
         if (g_nivelAtual == 4 && g_PosBolaTwo.y < -0.2f) {
-            g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f); // Spawn do J2 na Pista 4
+            g_PosBolaTwo = glm::vec3(7.5f, 1.625f, 0.2f); // Spawn do J2 na Pista 4 (lado a lado com J1)
             g_VelocidadeBolaTwo = glm::vec3(0.0f);
         } else if (g_nivelAtual == 5 && g_PosBolaTwo.y < -0.2f) {
             g_PosBolaTwo = glm::vec3(-4.0f, 8.4f, -2.41f);
