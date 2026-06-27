@@ -154,6 +154,7 @@ struct SceneObject
 #define ESPINHOS 27
 #define PISTASPIRAL 28
 #define BORDASSPIRAL 29
+#define PISTAQUATRO2 30
 
 // =============================================
 // ENUM DE ESTADO DO JOGO

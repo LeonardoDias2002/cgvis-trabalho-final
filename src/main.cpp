@@ -230,13 +230,14 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
     LoadTextureImage("../../data/rocky_terrain_02_diff_1k.jpg"); // TextureImage1
     LoadTextureImage("../../data/golf_fbx_golf_club_BaseColor.png"); // TextureImage2
-    LoadTextureImage("../../data/t7.jpg");        // TextureImage3
+    LoadTextureImage("../../data/folha.jpg");        // TextureImage3
     LoadTextureImage("../../data/tronco.jpg");    // TextureImage4
     LoadTextureImage("../../data/grass.jpg");     // TextureImage5
-    LoadTextureImage("../../data/track.jpg");     // TextureImage6
+    LoadTextureImage("../../data/espinhos.png");     // TextureImage6
     LoadTextureImage("../../data/zeppelin.png");  // TextureImage7
-    LoadTextureImage("../../data/paredes.png");   // TextureImage8
-    LoadTextureImage("../../data/espinhos.png");  // TextureImage9
+    //LoadTextureImage("../../data/bandeira.png"); // TextureImage8 <- imagina que isso exista - Gabriel
+    LoadTextureImage("../../data/paredes.png");   // TextureImage9
+
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -407,6 +408,14 @@ int main(int argc, char* argv[])
                         float len = glm::length(normal);
                         bool isBorda = (shape.name.find("bordas") != std::string::npos || shape.name.find("Bordas") != std::string::npos);
                         bool isEspinho = (shape.name.find("Espinhos") != std::string::npos || shape.name.find("espinhos") != std::string::npos);
+                        
+                        if (!isBorda && len > 1e-7f && (normal.y / len) < -0.1f) {
+                            glm::vec3 temp = v1;
+                            v1 = v2;
+                            v2 = temp;
+                            normal = glm::cross(v1 - v0, v2 - v0);
+                        } 
+
                         if (isBorda) {
                             g_PistaQuatroWallTriangles.push_back({v0, v1, v2});
                         } else if (len > 1e-7f) {
@@ -951,6 +960,12 @@ int main(int argc, char* argv[])
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, ESPINHOS);
             DrawVirtualObject("Espinhos");
+            glDisable(GL_CULL_FACE); // Disable cull face for PistaQuatro_2 in case of flipped winding order
+
+            model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PISTAQUATRO2);
+            DrawVirtualObject("PistaQuatro_2");
             glEnable(GL_CULL_FACE); // Restaura para o resto da cena
         }
 
@@ -1218,15 +1233,37 @@ void LoadTextureImage(const char* filename)
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
 void DrawVirtualObject(const char* object_name)
 {
+    std::string resolved_name = object_name;
+    if (g_VirtualScene.find(resolved_name) == g_VirtualScene.end())
+    {
+        for (const auto& pair : g_VirtualScene)
+        {
+            if (pair.first.find(object_name) != std::string::npos ||
+                resolved_name.find(pair.first) != std::string::npos)
+            {
+                resolved_name = pair.first;
+                break;
+            }
+            std::string clean_key = pair.first;
+            while (!clean_key.empty() && (clean_key.back() == '\r' || clean_key.back() == '\n' || clean_key.back() == ' ')) {
+                clean_key.pop_back();
+            }
+            if (clean_key == resolved_name) {
+                resolved_name = pair.first;
+                break;
+            }
+        }
+    }
+
     // "Ligamos" o VAO. Informamos que queremos utilizar os atributos de
     // vértices apontados pelo VAO criado pela função BuildTrianglesAndAddToVirtualScene(). Veja
     // comentários detalhados dentro da definição de BuildTrianglesAndAddToVirtualScene().
-    glBindVertexArray(g_VirtualScene[object_name].vertex_array_object_id);
+    glBindVertexArray(g_VirtualScene[resolved_name].vertex_array_object_id);
 
     // Setamos as variáveis "bbox_min" e "bbox_max" do fragment shader
     // com os parâmetros da axis-aligned bounding box (AABB) do modelo.
-    glm::vec3 bbox_min = g_VirtualScene[object_name].bbox_min;
-    glm::vec3 bbox_max = g_VirtualScene[object_name].bbox_max;
+    glm::vec3 bbox_min = g_VirtualScene[resolved_name].bbox_min;
+    glm::vec3 bbox_max = g_VirtualScene[resolved_name].bbox_max;
     glUniform4f(g_bbox_min_uniform, bbox_min.x, bbox_min.y, bbox_min.z, 1.0f);
     glUniform4f(g_bbox_max_uniform, bbox_max.x, bbox_max.y, bbox_max.z, 1.0f);
 
@@ -1236,10 +1273,10 @@ void DrawVirtualObject(const char* object_name)
     // a documentação da função glDrawElements() em
     // http://docs.gl/gl3/glDrawElements.
     glDrawElements(
-        g_VirtualScene[object_name].rendering_mode,
-        g_VirtualScene[object_name].num_indices,
+        g_VirtualScene[resolved_name].rendering_mode,
+        g_VirtualScene[resolved_name].num_indices,
         GL_UNSIGNED_INT,
-        (void*)(g_VirtualScene[object_name].first_index * sizeof(GLuint))
+        (void*)(g_VirtualScene[resolved_name].first_index * sizeof(GLuint))
     );
 
     // "Desligamos" o VAO, evitando assim que operações posteriores venham a
@@ -2672,7 +2709,7 @@ void MenuRenderSettings(GLFWwindow* window)
     const char* gramaOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Textura Realista", "Verde Solido"};
     const char* paredeOpcoes[] = {"Terreno Rochoso", "Tijolo Vermelho", "Cinza Solido"};
     const char* bolaOpcoes[] = {"Branca", "Tijolo", "Rochosa"};
-    const char* tacoOpcoes[] = {"Metal Cinza", "Texturizado", "Tijolo"};
+    const char* tacoOpcoes[] = {"Metal", "Cinza Solido", "Tijolo Vermelho"};
 
     // Título
     glUseProgram(textprogram_id);

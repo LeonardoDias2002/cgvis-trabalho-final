@@ -52,6 +52,7 @@ uniform mat4 projection;
 #define ESPINHOS 27
 #define PISTASPIRAL 28
 #define BORDASSPIRAL 29
+#define PISTAQUATRO2 30
 
 
 uniform int object_id;
@@ -188,9 +189,9 @@ void main()
     }
     else if ( object_id == TACO )
     {
-        if (u_TexturaTaco == 0) {
+        if (u_TexturaTaco == 1) {
             Kd0 = vec3(0.7, 0.7, 0.7); // taco de metal (padrao)
-        } else if (u_TexturaTaco == 1) {
+        } else if (u_TexturaTaco == 0) {
             U = texcoords.x; V = texcoords.y;
             Kd0 = texture(TextureImage2, vec2(U,V)).rgb; // textura golf club
         } else {
@@ -298,7 +299,7 @@ void main()
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
-    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES || object_id == PISTAQUATRO || object_id == PISTASPIRAL)
+    else if ( object_id == PISTALOOP || object_id == PISTACURVA || object_id == PISTASIMPLES || object_id == PISTAQUATRO || object_id ==  PISTAQUATRO2 || object_id == PISTASPIRAL)
     {
         vec2 d = position_world.xz - u_HolePosition.xz;
         if (dot(d, d) < 0.0144 && abs(position_world.y - u_HolePosition.y) < 0.1) discard;
@@ -376,6 +377,27 @@ void main()
         Ks = vec3(0.0, 0.0, 0.0);
         q = 1.0;
     }
+    else if ( object_id == ESPINHOS )
+    {
+        vec4 world_pos = position_world;
+        
+        // Box projection to avoid stretching on the spikes
+        vec3 n_abs = abs(normalize(normal.xyz));
+        if (n_abs.y > n_abs.x && n_abs.y > n_abs.z) {
+            U = world_pos.x * 2.0;
+            V = world_pos.z * 2.0;
+        } else if (n_abs.x > n_abs.z) {
+            U = world_pos.z * 2.0;
+            V = world_pos.y * 2.0;
+        } else {
+            U = world_pos.x * 2.0;
+            V = world_pos.y * 2.0;
+        }
+
+        Kd0 = texture(TextureImage2, vec2(U,V)).rgb;
+        Ks = vec3(0.1, 0.1, 0.1);
+        q = 10.0;
+    }
 
     if ( object_id == HUD_BARRA ) 
     {
@@ -388,6 +410,8 @@ void main()
         color.a = 1.0;
         return; // não aplica iluminação
     }
+
+
 
     // Equação de Iluminação (Toon Shading)
     float lambert = max(0.0, dot(n,l));
@@ -416,23 +440,6 @@ void main()
     float atenuacao = 1.0 / ( constant + linear * distance + quadratic * distance * distance);
 
         color.rgb = ( Kd0 * (lambert + 0.2) + Ks * specular) * atenuacao;
-
-    // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
-    // necessário:
-    // 1) Habilitar a operação de "blending" de OpenGL logo antes de realizar o
-    //    desenho dos objetos transparentes, com os comandos abaixo no código C++:
-    //      glEnable(GL_BLEND);
-    //      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    // 2) Realizar o desenho de todos objetos transparentes *após* ter desenhado
-    //    todos os objetos opacos; e
-    // 3) Realizar o desenho de objetos transparentes ordenados de acordo com
-    //    suas distâncias para a câmera (desenhando primeiro objetos
-    //    transparentes que estão mais longe da câmera).
-    // Alpha default = 1 = 100% opaco = 0% transparente
-    color.a = 1.0;
-    if (object_id == BOLA && u_BolaInativa == 1) {
-        color.a = 0.4;
-    }
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
