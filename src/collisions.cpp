@@ -78,11 +78,11 @@ float RaycastTrackHeight(const std::vector<TrackTriangle>& tris,
         float f = 1.0f / a;
         glm::vec3 s = orig - tri.v0;
         float u = f * glm::dot(s, h);
-        if (u < 0.0f || u > 1.0f) continue;
+        if (u < -1e-4f || u > 1.0f + 1e-4f) continue;
 
         glm::vec3 q = glm::cross(s, e1);
         float v = f * glm::dot(dir, q);
-        if (v < 0.0f || u + v > 1.0f) continue;
+        if (v < -1e-4f || u + v > 1.0f + 1e-4f) continue;
 
         float t = f * glm::dot(e2, q);
         if (t > 1e-5f) { // O raio cruzou o triângulo!

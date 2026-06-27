@@ -283,6 +283,10 @@ extern std::vector<TrackTriangle> g_PistaLoopTriangles;
 extern std::vector<TrackTriangle> g_PistaLoopAllTriangles; // ALL triangles for 3D physics
 extern std::vector<TrackTriangle> g_PistaQuatroTriangles;
 extern std::vector<TrackTriangle> g_PistaQuatroAllTriangles;
+extern std::vector<TrackTriangle> g_PistaQuatroWallTriangles;
+extern std::vector<TrackTriangle> g_PistaSpiralTriangles;
+extern std::vector<TrackTriangle> g_PistaSpiralAllTriangles;
+extern std::vector<TrackTriangle> g_PistaSpiralWallTriangles;
 
 // --- Sistema de Menu ---
 extern GameState g_CurrentState;

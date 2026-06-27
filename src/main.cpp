@@ -406,10 +406,24 @@ int main(int argc, char* argv[])
                         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
                         float len = glm::length(normal);
                         bool isBorda = (shape.name.find("bordas") != std::string::npos || shape.name.find("Bordas") != std::string::npos);
-                        if (!isBorda && len > 1e-7f) {
+                        bool isEspinho = (shape.name.find("Espinhos") != std::string::npos || shape.name.find("espinhos") != std::string::npos);
+                        if (isBorda) {
+                            g_PistaQuatroWallTriangles.push_back({v0, v1, v2});
+                        } else if (len > 1e-7f) {
                             g_PistaQuatroAllTriangles.push_back({v0, v1, v2});
-                            if ((normal.y / len) > 0.3f) {
-                                g_PistaQuatroTriangles.push_back({v0, v1, v2});
+                            if ((normal.y / len) > 0.1f) {
+                                if (!isEspinho) {
+                                    // Pista 4 possui um abismo entre o X local 2.0 e 7.0 (aproximadamente)
+                                    // Removemos os triângulos de chão dessa região para que a bola caia no buraco fisicamente.
+                                    float cx = (v0.x + v1.x + v2.x) / 3.0f;
+                                    float cy = (v0.y + v1.y + v2.y) / 3.0f;
+                                    // O world X do gap fica entre -6.0 e -2.2 e o chão fantasma está em Y < 0.1
+                                    if (cx > -6.0f && cx < -2.2f && cy < 0.1f) {
+                                        // É o chão fantasma debaixo dos espinhos! Não adicionamos à física.
+                                    } else {
+                                        g_PistaQuatroTriangles.push_back({v0, v1, v2});
+                                    }
+                                }
                             }
                         }
                     }
@@ -417,7 +431,51 @@ int main(int argc, char* argv[])
                 idx_offset += fv;
             }
         }
-        printf("PistaQuatro: %zu triângulos de chão extraídos para heightmap.\n", g_PistaQuatroTriangles.size());
+        printf("PistaQuatro: %zu triângulos de chão extraídos para heightmap.\\n", g_PistaQuatroTriangles.size());
+    }
+
+    // Extrair triângulos da PistaSpiral para heightmap com a mesma transformação usada na renderização
+    {
+        const auto& attrib = PistaSpiralmodel.attrib;
+        float scale = 0.85f;
+        float x_off = -8.0f;
+        float y_off = 0.0f;
+        float z_off = 0.0f;
+        for (const auto& shape : PistaSpiralmodel.shapes) {
+            size_t idx_offset = 0;
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                int fv = shape.mesh.num_face_vertices[f];
+                if (fv >= 3) {
+                    glm::vec3 v0(
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+0]*scale + x_off,
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+1]*scale + y_off,
+                        attrib.vertices[3*shape.mesh.indices[idx_offset+0].vertex_index+2]*scale + z_off);
+                    for (int t = 1; t < fv - 1; t++) {
+                        glm::vec3 v1(
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+0]*scale + x_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+1]*scale + y_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t].vertex_index+2]*scale + z_off);
+                        glm::vec3 v2(
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+0]*scale + x_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+1]*scale + y_off,
+                            attrib.vertices[3*shape.mesh.indices[idx_offset+t+1].vertex_index+2]*scale + z_off);
+                        glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
+                        float len = glm::length(normal);
+                        bool isBorda = (shape.name.find("bordas") != std::string::npos || shape.name.find("Bordas") != std::string::npos);
+                        if (isBorda) {
+                            g_PistaSpiralWallTriangles.push_back({v0, v1, v2});
+                        } else if (len > 1e-7f) {
+                            g_PistaSpiralAllTriangles.push_back({v0, v1, v2});
+                            if ((normal.y / len) < -0.3f) {
+                                g_PistaSpiralTriangles.push_back({v0, v1, v2});
+                            }
+                        }
+                    }
+                }
+                idx_offset += fv;
+            }
+        }
+        printf("PistaSpiral: %zu triângulos de chão extraídos para heightmap.\\n", g_PistaSpiralTriangles.size());
     }
 
         // Caminho do Loop (Path Following Waypoints)
@@ -729,6 +787,7 @@ int main(int argc, char* argv[])
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
                 else if (g_nivelAtual == 4) ray_y = RaycastTrackHeight(g_PistaQuatroTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
+                else if (g_nivelAtual == 5) ray_y = RaycastTrackHeight(g_PistaSpiralTriangles, pos_dot.x, g_PosBola.y, pos_dot.z, g_PosBola.y);
 
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -753,6 +812,7 @@ int main(int argc, char* argv[])
                 if (g_nivelAtual == 3) ray_y = RaycastTrackHeight(g_PistaLoopTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
                 else if (g_nivelAtual == 2) ray_y = RaycastTrackHeight(g_PistaCurvaTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
                 else if (g_nivelAtual == 4) ray_y = RaycastTrackHeight(g_PistaQuatroTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
+                else if (g_nivelAtual == 5) ray_y = RaycastTrackHeight(g_PistaSpiralTriangles, pos_dot.x, g_PosBolaTwo.y, pos_dot.z, g_PosBolaTwo.y);
 
                 model = Matrix_Translate(pos_dot.x, ray_y + 0.01f, pos_dot.z) * Matrix_Scale(0.015f, 0.015f, 0.015f);
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -765,7 +825,7 @@ int main(int argc, char* argv[])
         glUniform3f(glGetUniformLocation(g_GpuProgramID, "u_HolePosition"), g_HolePosition.x, g_HolePosition.y, g_HolePosition.z);
 
         // Montanha de grama que sobe para abraçar o buraco por fora 
-        if (g_nivelAtual == 2 || g_nivelAtual == 3 || g_nivelAtual == 4 || g_nivelAtual == 5) { //mudar isso se necessario
+        if (g_nivelAtual == 2 || g_nivelAtual == 3) { 
             model = Matrix_Translate(g_HolePosition.x, g_HolePosition.y - 0.15f, g_HolePosition.z) * Matrix_Scale(0.6f, 0.14f, 0.6f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GRAMA);
@@ -874,14 +934,14 @@ int main(int argc, char* argv[])
 
         // Nível 4: Pista Quatro
         if (g_nivelAtual == 4) {
-            glEnable(GL_CULL_FACE);
-
+            glEnable(GL_CULL_FACE); // Evita rachaduras no chão
 
             model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTAQUATRO);
             DrawVirtualObject("PistaQuatro");
 
+            glDisable(GL_CULL_FACE); // Paredes finas precisam ser vistas de ambos os lados para não piscarem
             model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BORDASQUATRO);
@@ -891,21 +951,22 @@ int main(int argc, char* argv[])
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, ESPINHOS);
             DrawVirtualObject("Espinhos");
+            glEnable(GL_CULL_FACE); // Restaura para o resto da cena
         }
 
         // Nível 5: Pista Spiral
         if (g_nivelAtual == 5) {
-            glEnable(GL_CULL_FACE);
+            glDisable(GL_CULL_FACE);
 
             model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, PISTASPIRAL);
-            DrawVirtualObject("PistaQuatro");
+            DrawVirtualObject("PistaSpiral");
 
             model = Matrix_Translate(-8.0f, 0.0f, 0.0f) * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, BORDASSPIRAL);
-            DrawVirtualObject("PistaQuatroBordas");
+            DrawVirtualObject("SpiralBordas");
 
         }
 
@@ -985,12 +1046,15 @@ int main(int argc, char* argv[])
             if (g_nivelAtual == 1) { cx = 0.0f; cz = 0.5f; }
             else if (g_nivelAtual == 2) { cx = 1.365f; cz = -2.15f; }
             else if (g_nivelAtual == 3) { cx = 2.5f; cz = 1.35f; }
-            else if (g_nivelAtual == 4) { cx = 2.5f; cz = 3.35f; }
-            else if (g_nivelAtual == 4) { cx = 2.5f; cz = 3.35f; } // mudar isso também se necessario
+            else if (g_nivelAtual == 4) { cx = 0.0f; cz = 0.0f; } // Centraliza a floresta perfeitamente em volta de toda a pista
+            else if (g_nivelAtual == 5) { cx = -4.26f; cz = -2.41f; } // Centraliza a floresta em volta da espiral
+
+            float r_offset = (g_nivelAtual == 4) ? 5.0f : 0.0f;
+
             for (int i = 0; i < 60; i++) {
                 float angle = (i / 60.0f) * 2.0f * M_PI;
                 // Raio variavel adaptado pro tamanho da fase
-                float radius = 10.0f + (i % 5) * 1.5f;
+                float radius = 10.0f + (i % 5) * 1.5f + r_offset;
                 float tx = cx + cos(angle) * radius;
                 float tz = cz + sin(angle) * radius;
 
@@ -2976,15 +3040,15 @@ void MenuHandleClick(GLFWwindow* window)
                     g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
                     g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
                 } else if (g_nivelAtual == 4) {
-                    // PistaQuatro: posições iniciaisis
+                    // PistaQuatro: posições iniciaisis originais
                     g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
                     g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
                     g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
                 } else if (g_nivelAtual == 5) {
-                    // PistaCinco: posições iniciaisis
-                    g_PosBola = glm::vec3(0.0f, 0.025f, -4.3f);
-                    g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -4.3f);
-                    g_HolePosition = glm::vec3(0.0f, 0.0f, 3.8f);
+                    // PistaCinco: posições iniciais (Top of the spiral)
+                    g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
+                    g_PosBolaTwo = glm::vec3(-4.0f, 8.4f, -2.41f);
+                    g_HolePosition = glm::vec3(-4.26f, 0.05f, 0.17f);
                 }
 
                 break;
@@ -3078,9 +3142,9 @@ void ProxNivel(GLFWwindow* window) {
         g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f);
         g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
     } else if (g_nivelAtual == 5) {
-        g_PosBola = glm::vec3(0.0f, 0.025f, -4.3f);
-        g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -4.3f);
-        g_HolePosition = glm::vec3(0.0f, 0.0f, 3.8f);
+        g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
+        g_PosBolaTwo = glm::vec3(-4.0f, 8.4f, -2.41f);
+        g_HolePosition = glm::vec3(-4.26f, 0.05f, 0.17f);
     }
 }
 
@@ -3388,7 +3452,8 @@ static void AtualizarFisicaSubstep(glm::vec3& pos, glm::vec3& vel,
 static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                                    glm::mat4& rot_matrix, float dt,
                                    const std::vector<TrackTriangle>& allTriangles,
-                                   const std::vector<TrackTriangle>& floorTriangles)
+                                   const std::vector<TrackTriangle>& floorTriangles,
+                                   const std::vector<TrackTriangle>& wallTriangles = {})
 {
     const int N = std::max(1, (int)(dt / 0.001f));
     float sub = dt / N;
@@ -3397,47 +3462,79 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
         vel.y -= GRAVITY * sub;
         glm::vec3 next_pos = pos + vel * sub;
 
-        // Planar boundary containment (Invisible Walls)
-        // Elevado para +2.0f para ignorar problemas de tunneling
-        float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
-
-        if (checkY < -1e8f) {
-            float min_d2_edge = 1e9f;
-            glm::vec3 best_cp = next_pos;
-            for (const auto& tri : floorTriangles) {
+        // True 3D Mesh Wall Collisions (If track has walls extracted)
+        if (!wallTriangles.empty()) {
+            for (const auto& tri : wallTriangles) {
                 glm::vec3 n;
                 glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
                 float dx = next_pos.x - cp.x;
-                float dy = pos.y - cp.y;
+                float dy = pos.y - cp.y; // Using pos.y instead of next_pos.y prevents launching upwards
                 float dz = next_pos.z - cp.z;
                 float d2 = dx*dx + dy*dy + dz*dz;
-                if (d2 < min_d2_edge) {
-                    min_d2_edge = d2;
-                    best_cp = cp;
-                }
-            }
-
-            if (min_d2_edge > 0.0004f) {
-                glm::vec2 diff(next_pos.x - best_cp.x, next_pos.z - best_cp.z);
-                float dist = glm::length(diff);
-                if (dist > 1e-4f) {
-                    glm::vec2 wall_normal = diff / dist;
-                    glm::vec2 vel_xz(vel.x, vel.z);
-                    float vel_into_wall = glm::dot(vel_xz, wall_normal);
-
-                    if (vel_into_wall > 0.0f) {
-                        vel.x -= wall_normal.x * vel_into_wall * 1.5f;
-                        vel.z -= wall_normal.y * vel_into_wall * 1.5f;
-
-                        if (g_audioInitialized && vel_into_wall > 0.5f) {
-                            ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
-                            ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
-                            ma_sound_start(&g_wallSound);
+                
+                if (d2 < BALL_RADIUS * BALL_RADIUS && d2 > 1e-8f) {
+                    float dist = std::sqrt(d2);
+                    glm::vec3 push = glm::vec3(dx, dy, dz) / dist;
+                    // Push outwards along X and Z
+                    next_pos.x += push.x * (BALL_RADIUS - dist);
+                    next_pos.z += push.z * (BALL_RADIUS - dist);
+                    
+                    glm::vec2 wall_normal(push.x, push.z);
+                    if (glm::length(wall_normal) > 1e-4f) {
+                        wall_normal = glm::normalize(wall_normal);
+                        glm::vec2 vel_xz(vel.x, vel.z);
+                        float vel_into_wall = glm::dot(vel_xz, wall_normal);
+                        if (vel_into_wall < 0.0f) { // Only bounce if moving INTO the wall
+                            vel.x -= wall_normal.x * vel_into_wall * 1.5f;
+                            vel.z -= wall_normal.y * vel_into_wall * 1.5f;
+                            
+                            if (g_audioInitialized && vel_into_wall < -0.5f) {
+                                ma_sound_set_volume(&g_wallSound, g_AmbientVolume * 0.5f);
+                                ma_sound_seek_to_pcm_frame(&g_wallSound, 0);
+                                ma_sound_start(&g_wallSound);
+                            }
                         }
                     }
                 }
-                next_pos.x = best_cp.x;
-                next_pos.z = best_cp.z;
+            }
+        }
+
+        // Planar boundary containment (Invisible Walls) - ONLY for legacy tracks without wall meshes
+        if (wallTriangles.empty()) {
+            float checkY = RaycastTrackHeight(floorTriangles, next_pos.x, pos.y + 2.0f, next_pos.z, -1e9f);
+            if (checkY < -1e8f) {
+                float min_d2_edge = 1e9f;
+                glm::vec3 best_cp = next_pos;
+                for (const auto& tri : floorTriangles) {
+                    glm::vec3 n;
+                    glm::vec3 cp = ClosestPointOnTriangle(next_pos, tri.v0, tri.v1, tri.v2, n);
+                    float dx = next_pos.x - cp.x;
+                    float dy = pos.y - cp.y;
+                    float dz = next_pos.z - cp.z;
+                    float d2 = dx*dx + dy*dy + dz*dz;
+                    if (d2 < min_d2_edge) {
+                        min_d2_edge = d2;
+                        best_cp = cp;
+                    }
+                }
+                if (min_d2_edge > 0.0004f) {
+                    glm::vec2 diff(next_pos.x - best_cp.x, next_pos.z - best_cp.z);
+                    float dist = glm::length(diff);
+                    if (dist > 1e-4f) {
+                        glm::vec2 wall_normal = diff / dist;
+                        glm::vec2 vel_xz(vel.x, vel.z);
+                        float vel_into_wall = glm::dot(vel_xz, wall_normal);
+                        if (vel_into_wall > 0.0f) {
+                            vel.x -= wall_normal.x * vel_into_wall * 1.5f;
+                            vel.z -= wall_normal.y * vel_into_wall * 1.5f;
+                        }
+                        next_pos.x = best_cp.x - wall_normal.x * 0.015f;
+                        next_pos.z = best_cp.z - wall_normal.y * 0.015f;
+                    } else {
+                        next_pos.x = best_cp.x;
+                        next_pos.z = best_cp.z;
+                    }
+                }
             }
         }
 
@@ -3459,22 +3556,34 @@ static void AtualizarFisicaMalha3D(glm::vec3& pos, glm::vec3& vel,
                     sY = cp.y;
                 }
             }
+            // Limit gap filler distance to avoid creating infinite glass floors over real gaps!
+            if (min_d2 > 0.01f) {
+                sY = -1e9f;
+            }
         }
 
+        // Prevent teleporting UP if the ball is deep inside a gap
         if (sY > -1e8f) {
-            if (pos.y <= sY + BALL_RADIUS) {
+            // Only snap if the ball is not falling from far below the ledge
+            if (pos.y <= sY + BALL_RADIUS && pos.y >= sY - 0.2f) {
                 pos.y = sY + BALL_RADIUS;
-                if (vel.y < 0.0f) {
+                if (vel.y < -0.8f) {
+                    vel.y = -vel.y * 0.4f; // Bounce realism when landing from a jump!
+                } else if (vel.y < 0.0f) {
                     vel.y = 0.0f;
                 }
             }
         }
 
-        // Apply continuous floor friction
+        // Apply continuous floor friction to horizontal movement only
         vel.x -= vel.x * 0.8f * sub;
         vel.z -= vel.z * 0.8f * sub;
 
-        if (glm::length(vel) < 0.05f) vel = glm::vec3(0.0f);
+        // Minimum velocity threshold applied only to X/Z so gravity (Y) can accumulate
+        if (glm::length(glm::vec2(vel.x, vel.z)) < 0.05f) {
+            vel.x = 0.0f;
+            vel.z = 0.0f;
+        }
     }
 
     // Rotação visual
@@ -3534,10 +3643,23 @@ void AtualizarFisicaBola(float delta_time) {
         else if (g_nivelAtual == 4)
             AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
                                    g_BolaRotationMatrix, delta_time,
-                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles);
+                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles, g_PistaQuatroWallTriangles);
+        else if (g_nivelAtual == 5)
+            AtualizarFisicaMalha3D(g_PosBola, g_VelocidadeBola,
+                                   g_BolaRotationMatrix, delta_time,
+                                   g_PistaSpiralAllTriangles, g_PistaSpiralTriangles, g_PistaSpiralWallTriangles);
         else
             AtualizarFisicaSubstep(g_PosBola, g_VelocidadeBola,
                                    g_BolaRotationMatrix, delta_time, g_nivelAtual);
+                                   
+        // Lógica de Respawn se cair da pista
+        if (g_nivelAtual == 4 && g_PosBola.y < -0.2f) {
+            g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
+            g_VelocidadeBola = glm::vec3(0.0f);
+        } else if (g_nivelAtual == 5 && g_PosBola.y < -0.2f) {
+            g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
+            g_VelocidadeBola = glm::vec3(0.0f);
+        }
     }
 }
 
@@ -3589,10 +3711,23 @@ void AtualizarFisicaBolaTwo(float delta_time) {
         else if (g_nivelAtual == 4)
             AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
                                    g_BolaRotationMatrixTwo, delta_time,
-                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles);
+                                   g_PistaQuatroAllTriangles, g_PistaQuatroTriangles, g_PistaQuatroWallTriangles);
+        else if (g_nivelAtual == 5)
+            AtualizarFisicaMalha3D(g_PosBolaTwo, g_VelocidadeBolaTwo,
+                                   g_BolaRotationMatrixTwo, delta_time,
+                                   g_PistaSpiralAllTriangles, g_PistaSpiralTriangles, g_PistaSpiralWallTriangles);
         else
             AtualizarFisicaSubstep(g_PosBolaTwo, g_VelocidadeBolaTwo,
                                    g_BolaRotationMatrixTwo, delta_time, g_nivelAtual);
+                                   
+        // Lógica de Respawn se cair da pista (Independente para Jogador 2)
+        if (g_nivelAtual == 4 && g_PosBolaTwo.y < -0.2f) {
+            g_PosBolaTwo = glm::vec3(1.3f, 0.025f, -1.0f); // Spawn do J2 na Pista 4
+            g_VelocidadeBolaTwo = glm::vec3(0.0f);
+        } else if (g_nivelAtual == 5 && g_PosBolaTwo.y < -0.2f) {
+            g_PosBolaTwo = glm::vec3(-4.0f, 8.4f, -2.41f);
+            g_VelocidadeBolaTwo = glm::vec3(0.0f);
+        }
     }
 }
 
