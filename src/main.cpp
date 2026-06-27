@@ -3080,7 +3080,7 @@ void MenuHandleClick(GLFWwindow* window)
                     // PistaQuatro: posições iniciaisis originais
                     g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
                     g_PosBolaTwo = glm::vec3(7.5f, 1.625f, 0.2f);
-                    g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
+                    g_HolePosition = glm::vec3(-10.0f, 0.0f, 0.5f);
                 } else if (g_nivelAtual == 5) {
                     // PistaCinco: posições iniciais (Top of the spiral)
                     g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
@@ -3162,27 +3162,33 @@ void ProxNivel(GLFWwindow* window) {
     g_BolaRotationMatrixTwo = glm::mat4(1.0f);
     g_TacoRotacao = 0.0f;
 
+    // Posições dependem do nível 
     if (g_nivelAtual == 1) {
-        g_PosBola = glm::vec3(0.0f, 0.025f, -3.0f);
-        g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -3.0f);
-        g_HolePosition = glm::vec3(0.0f, 0.0f, 4.0f);
+        g_PosBola = glm::vec3(0.0f, 0.025f, -4.3f);
+        g_PosBolaTwo = glm::vec3(0.5f, 0.025f, -4.3f);
+        g_HolePosition = glm::vec3(0.0f, 0.0f, 3.8f);
     } else if (g_nivelAtual == 2) {
+        // PistaCurva: spawn no centro da seção larga, hole no final
         g_PosBola = glm::vec3(3.0f, 0.1f, -1.0f);
         g_PosBolaTwo = glm::vec3(2.7f, 0.1f, -1.0f);
         g_HolePosition = glm::vec3(-0.27f, 0.07f, -3.3f);
     } else if (g_nivelAtual == 3) {
+        // PistaLoop: spawn no início, hole no fim
         g_PosBola = glm::vec3(3.7f, 0.15f, -6.5f);
         g_PosBolaTwo = glm::vec3(3.2f, 0.15f, -6.5f);
         g_HolePosition = glm::vec3(1.3f, 0.12f, 9.2f);
     } else if (g_nivelAtual == 4) {
+        // PistaQuatro: posições iniciaisis originais
         g_PosBola = glm::vec3(7.5f, 1.625f, 0.8f);
         g_PosBolaTwo = glm::vec3(7.5f, 1.625f, 0.2f);
-        g_HolePosition = glm::vec3(-8.0f, 0.025f, 0.5f);
+        g_HolePosition = glm::vec3(-10.0f, 0.0f, 0.5f);
     } else if (g_nivelAtual == 5) {
+        // PistaCinco: posições iniciais (Top of the spiral)
         g_PosBola = glm::vec3(-4.26f, 8.4f, -2.41f);
         g_PosBolaTwo = glm::vec3(-4.0f, 8.4f, -2.41f);
         g_HolePosition = glm::vec3(-4.26f, 0.05f, 0.17f);
     }
+
 }
 
 // Forward declaration (definição completa abaixo)
